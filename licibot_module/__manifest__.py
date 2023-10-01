@@ -14,7 +14,7 @@
     'external_dependencies': {'python': ['pandas', 'requests']},
     'license': 'OPL-1',
     'data': [
-        'data/cron_calcular_ranking.xml'
+        'data/crones_licibot.xml'
     ],
     'active': True,
     'installable': True,

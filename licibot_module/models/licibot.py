@@ -6,6 +6,7 @@ import logging
 # Importando librerías externas
 import requests 
 import time
+import datetime
 import pandas as pd
 
 _logger = logging.getLogger(__name__)
@@ -526,35 +527,6 @@ class Licitacion(models.Model):
                 _logger.info(f"Intento {retry+1} de {max_retries}. Error de tiempo de espera: {e}")
                 time.sleep(5)  # Esperar 5 segundos antes de reintentar
 
-    def calculo_rankingv1(self):
-        '''
-        Función que calcula el ranking para los 20 primeros rut_unidad de la vista RANKING_V1.
-        Primero, limpia todos los registros para el campo ranking en la tabla UnidadCompra.
-        Segundo, crea una lista con los rut_unidad en la vista RANKING_V1.
-        Tercero, recorre esa lista y para los primeros 20 elementos asigna de forma secuencial el ranking.
-        '''
-        for rec in self: 
-
-            # Limpiar todos los valores del campo "ranking" en el modelo UnidadCompra
-            self.env.cr.execute("DELETE ranking from licibot_unidad_compra")
-
-            # Recuperar la lista de rut_unidad de la vista RANKING_V1
-            self.env.cr.execute("SELECT rut_unidad FROM RANKING_V1")
-            rut_unidad_list = list(line[0] for line in self.env.cr.fetchall())
-
-            # Inicializar el contador de ranking
-            ranking = 1
-
-            # Actualizar el campo "ranking" en el modelo UnidadCompra para los primeros 20 elementos de la lista
-            for rut_unidad in rut_unidad_list[:20]:
-
-                # Actualizar el campo "ranking" en el modelo UnidadCompra
-                unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('rut_unidad', '=', rut_unidad)])
-                unidad_compra.sudo().write({'ranking': ranking})
-                
-                # Incrementar el contador de ranking para el siguiente valor
-                ranking += 1
-
     def poblamiento_inicial (self):
         """
         ## Descripción
@@ -854,6 +826,57 @@ class Licitacion(models.Model):
             # Capturar la señal de "Ctrl + C" para detener la ejecución
             _logger.info("Se ha detenido la ejecución. Guardando los datos recopilados hasta ahora en la base de datos.")
 
+    def licitaciones_semana_anterior (self):
+        ''' Esta función debe buscar todos los códigos externos o id's de licitaciones que se hayan agregado la semana pasada (en el contexto de que el calculo del ranking
+        se haga de forma semanal, por ejemplo cada lunes.)
+        Retornara la lista de aquellas licitaciones'''
+        # Obtener la fecha de hoy
+        fecha_actual = datetime.date.today()
+        print(f"fecha_actual: {fecha_actual}")
+
+        # Calcular la fecha del lunes de la semana anterior
+        delta_dias = (fecha_actual.weekday()) % 7  # 0 para lunes, 1 para martes, ..., 6 para domingo
+        print(f"delta_dias: {delta_dias}")
+        fecha_lunes_semana_anterior = fecha_actual - datetime.timedelta(days=delta_dias, weeks=1)
+        print(f"fecha_lunes_semana_anterior: {fecha_lunes_semana_anterior}")
+
+        # Calcular la fecha del domingo de la semana anterior
+        fecha_domingo_semana_anterior = fecha_lunes_semana_anterior + datetime.timedelta(days=6)
+        print(f"fecha_domingo_semana_anterior: {fecha_domingo_semana_anterior}")
+
+        '''
+            TODO Falta por agregar la lógica que busque todas aquellas licitaciones que X variable de fecha este dentro de lunes-domingo semana anterior y la agregue a un listado
+            luego debera retornar ese listado (ya sea de id's o de codigo_externo) 
+        '''
+
+    def calculo_rankingv1(self):
+        '''
+        Función que calcula el ranking para los 20 primeros rut_unidad de la vista RANKING_V1.
+        Primero, limpia todos los registros para el campo ranking en la tabla UnidadCompra.
+        Segundo, crea una lista con los rut_unidad en la vista RANKING_V1.
+        Tercero, recorre esa lista y para los primeros 20 elementos asigna de forma secuencial el ranking.
+        '''
+
+        # Limpiar todos los valores del campo "ranking" en el modelo UnidadCompra
+        self.env.cr.execute("UPDATE licibot_unidad_compra SET ranking = NULL;")
+
+        # Recuperar la lista de rut_unidad de la vista RANKING_V1
+        self.env.cr.execute('SELECT "ID Unidad de Compra" FROM RANKING_V1;')
+        id_unidad_list = list(line[0] for line in self.env.cr.fetchall())
+
+        # Inicializar el contador de ranking
+        pos_ranking = 1
+
+        # Recorrer los primeros 20 elementos de la lista
+        for id_unidad in id_unidad_list[:20]:
+
+            # Buscar y actualizar el campo "ranking" en el modelo UnidadCompra
+            unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('id', '=', id_unidad)])
+            unidad_compra.sudo().write({'ranking': pos_ranking})
+            
+            # Incrementar el contador de ranking para el siguiente valor
+            pos_ranking += 1
+
     """
     =================================================================
                         FUNCIONES PARA EL CRM
@@ -864,8 +887,16 @@ class Licitacion(models.Model):
         '''Función que retorna el token de acceso necesario para utilizar la api del crm'''
 
         url = 'http://173.255.243.74:8069/token'
+        response = requests.get(url)
 
-        return requests.get(url)
+        if response.status_code == 200:
+            token = response.text 
+            _logger.info(f"\n TOKEN {token}")
+            return token
+        else:
+            _logger.error(f"\n Error al obtener el token. Código de estado: {response.status_code}")
+            return None
+
 
     def ol_crm_craft_json (self, codigo_externo, nombre_licitacion, tipo_licitacion, descripcion_licitacion, nombre_contacto, cargo_contacto, fecha_cierre):
         '''Función que arma un json con los parametros que recibe'''
@@ -881,24 +912,91 @@ class Licitacion(models.Model):
 
         return json
 
-    def ol_crm_send_info (self, token, json):
-        '''Función que envia un json al crm de odoo'''
+    def ol_crm_send_info (self):
+        '''Función que buscará en la base de datos las licitaciones de la semana anterior. Si algúna de ellas pertenece a una unidad de compra rankeada (20 puestos)
+        será enviada su información al CRM de Odoo'''
 
         # Si el token esta activo realizar proceso, si el token venció pedir nuevo token (?)
-
         token_crm = self.ol_crm_get_token()
-
-        '''
-            TODO Definir la lógica de lo que se desea enviar al CRM, ya que en nuestro caso priorizamos en el ranking unidades de compra
-            y el API CRM está pensado para recibir información de licitaciones:
-
-            - Confirmar información a enviar
-            - Comportamiento del CRM, la api los crea como tipo 'lead' pero en la vista se ven los que estan en 'opportunity' 
-        '''
 
         url = 'http://173.255.243.74:8069/licitaciones'
         headers = {'Authorization': token}
         response = requests.post(url, headers=headers, json=json)
+
+        '''
+            ///////////////////////////////////////////////////////////////////////////////////
+                 ////     ////       W O R K    I N    P R O G R E S S   ////    ////    ////
+            ///////////////////////////////////////////////////////////////////////////////////
+        '''
+
+    def ol_crm_send_info_provisoria (self):
+        '''De momento dado que la api de mercadopublico sigue caída lo que se quiere es que teniendo en consideración el ranking, se busque y se envie al CRM
+        la información de la última licitación registrada en la base de datos para cada una de esas unidades de compra dentro del ranking (20 en total)'''
+
+        _logger.info("-" * 50)
+        _logger.info("CRON CRM")
+        _logger.info("-" * 50)
+        # Listar las id de unidades de compra de la vista RANKING_V1
+        self.env.cr.execute('SELECT "ID Unidad de Compra" FROM RANKING_V1;')
+        id_unidad_list = list(line[0] for line in self.env.cr.fetchall())
+
+        n = 1
+
+        token = self.ol_crm_get_token()
+        _logger.info(f"\n TOKEN {token}")
+
+        for id_unidad in id_unidad_list[:20]:
+            query = f'''
+            SELECT  
+                licibot_unidad_compra.id, 
+                licibot_licitacion.codigo_externo,
+                licibot_licitacion.nombre,
+                licibot_tipo_licitacion.id,
+                licibot_tipo_licitacion.id_tipo_licitacion,
+                licibot_licitacion.descripcion,
+                licibot_licitacion.nom_contacto,
+                licibot_licitacion.cargo_contacto,
+                CASE 
+                    WHEN licibot_licitacion.fecha_cierre_1 IS NULL THEN TO_CHAR(licibot_licitacion.fecha_cierre_2,'YYYY-MM-DD')
+                    ELSE TO_CHAR(licibot_licitacion.fecha_cierre_1,'YYYY-MM-DD') 
+                END AS fecha_cierre,
+                licibot_unidad_compra.ranking
+            FROM licibot_unidad_compra 
+            JOIN licibot_licitacion ON licibot_unidad_compra.id = licibot_licitacion.unidad_compra_id 
+            JOIN licibot_tipo_licitacion ON licibot_licitacion.tipo_licitacion_id = licibot_tipo_licitacion.id
+            WHERE licibot_unidad_compra.id = {id_unidad} 
+            AND licibot_licitacion.fecha_creacion = (
+                SELECT MAX(fecha_creacion) FROM licibot_unidad_compra 
+                JOIN licibot_licitacion ON licibot_unidad_compra.id = licibot_licitacion.unidad_compra_id 
+                WHERE licibot_unidad_compra.id = {id_unidad}
+            );
+            '''
+            _logger.info(f"\n Licitación {n}")
+
+            self.env.cr.execute(query)
+            resultado = self.env.cr.fetchone()
+            _logger.info(f"""\n Resultado = (Codigo Externo = {resultado[1]}, 
+            Nombre Licitacion = {resultado[2]}, 
+            Tipo Licitacion = {resultado[4]}, 
+            Descripcion = {resultado[5]}, 
+            Nombre Contacto = {resultado[6]}, 
+            Cargo Contacto = {resultado[7]}, 
+            Fecha Cierre = {resultado[8]})""")
+            
+            json = self.ol_crm_craft_json(resultado[1], resultado[2], resultado[4], resultado[5], resultado[6], resultado[7], resultado[8])
+            '''
+            BUG Campo Descripción demaciado extenso
+            ERROR: index row size 3168 exceeds maximum 2712 for index "crm_lead_name_index"
+            HINT:  Values larger than 1/3 of a buffer page cannot be indexed.
+            Consider a function index of an MD5 hash of the value, or use full text indexing.
+            '''
+            
+            url = 'http://173.255.243.74:8069/licitaciones'
+            headers = {'Authorization': token}
+            response = requests.post(url, headers=headers, json=json)
+            
+            _logger.info(f"Respuesta de API CRM: Código {response.status_code}")
+            n += 1
 
 class ProductoServicio (models.Model):
     _name = 'licibot.producto.servicio'
@@ -925,21 +1023,22 @@ class ItemLicitacion (models.Model):
         modulo que contenga el modelo por herencia, es importante el decorador @api.model_cr'''
 
         query = '''
-        CREATE VIEW ranking_v1 AS
+        CREATE OR REPLACE VIEW ranking_v1 AS
         SELECT 
-            licibot_unidad_compra.rut_unidad AS "Rut Unidad de Compra",
+            licibot_unidad_compra.id AS "ID Unidad de Compra",
+            licibot_unidad_compra.nombre_unidad as "Nombre de Unidad de Compra",
             SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2022-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2022-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) AS "Monto Total Año Anterior",
             SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2023-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2023-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) AS "Monto Total Año Actual",
             SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2022-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2022-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) -
-            SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2023-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2023-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) AS "Diferencial"
+            SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2023-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2023-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) AS "Monto Diferencial"
         FROM 
-            licibot_unidad_compra
+            licibot_unidad_compra 
             JOIN licibot_licitacion ON licibot_unidad_compra.id = licibot_licitacion.unidad_compra_id
             JOIN licibot_item_licitacion ON licibot_licitacion.id = licibot_item_licitacion.licitacion_id
         GROUP BY 
-            licibot_unidad_compra.rut_unidad
+            licibot_unidad_compra.id
         ORDER BY
-            "Diferencial" DESC;
+            "Monto Diferencial" DESC;
         '''
 
         tools.drop_view_if_exists(self._cr, 'ranking_v1')
