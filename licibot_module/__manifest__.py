@@ -8,13 +8,14 @@
         Adicionalmente, permite 'rankear' a las unidades de compra según ciertos criterios.
     ''',
     'author': 'Daniel V., Ricardo A., Esteban S.',
-    'version': '1.0',
+    'version': '1.0.0',
     'website': '',
     'depends': ['crm', 'opens_licitacion_crm'],
     'external_dependencies': {'python': ['pandas', 'requests']},
     'license': 'OPL-1',
     'data': [
-        'data/crones_licibot.xml'
+        'data/crones_licibot.xml',
+        'views/res_config_settings_views.xml'
     ],
     'active': True,
     'installable': True,

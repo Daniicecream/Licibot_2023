@@ -8,8 +8,12 @@ import requests
 import time
 import datetime
 import pandas as pd
+import locale
 
 _logger = logging.getLogger(__name__)
+
+# Configura moneda local CLP
+locale.setlocale(locale.LC_MONETARY, 'es_CL.UTF-8')
 
 class Organismo(models.Model):
     _name = 'licibot.organismo'
@@ -473,6 +477,62 @@ class Licitacion(models.Model):
             'proveedor_id' : self.is_null_int(proveedor_select.id)
             })
 
+    def obtener_licitaciones_hoy(self, ticket):
+        fecha = self.get_fecha_actual()
+        url = "http://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json"
+        params = {"fecha": fecha, "ticket": ticket}
+
+        try:
+            response = requests.get(url, params=params)
+            response.raise_for_status()  # Genera una excepción si la solicitud no fue exitosa
+
+            data = response.json()
+
+            if "Listado" in data:
+                licitaciones = data["Listado"]
+                codigo_externo_list = [licitacion["CodigoExterno"] for licitacion in licitaciones]
+                return codigo_externo_list
+            else:
+                _logger.warning("No se encontraron licitaciones.")
+                return []
+        except requests.exceptions.RequestException as e:
+            _logger.error("Error en la solicitud HTTP: %s", e)
+            return []
+
+    def obtener_licitaciones_gas(self, codigos_externos, ticket, keywords):
+        licitaciones_filtradas = []
+
+        for codigo in codigos_externos:
+            url = "http://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json"
+            params = {"codigo": codigo, "ticket": ticket}
+
+            try:
+                response = requests.get(url, params=params)
+                response.raise_for_status()  # Genera una excepción si la solicitud no fue exitosa
+
+                data = response.json()
+
+                if "Listado" in data:
+                    licitacion = data["Listado"][0]  # El código externo es único.
+                    if "Nombre" in licitacion and "Descripcion" in licitacion and "Categoria" in licitacion:
+                        texto_licitacion = f"{licitacion['Nombre'].lower()} {licitacion['Descripcion'].lower()} {licitacion['Categoria'].lower()}"
+                        if any(keyword.strip().lower() in texto_licitacion for keyword in keywords.split(',')):
+                            licitaciones_filtradas.append(codigo)
+                else:
+                    _logger.warning(f"No se encontró licitación para el CodigoExterno {codigo}.")
+            except requests.exceptions.RequestException as e:
+                _logger.error("Error en la solicitud HTTP para el CodigoExterno %s: %s", codigo, e)
+
+        licitaciones_model = self.env['your.licitaciones.model']
+        licitaciones = licitaciones_model.search([('codigo_externo', 'in', licitaciones_filtradas)])
+        self.licitaciones_ids = [(6, 0, licitaciones.ids)]
+
+    def obtener_licitaciones_y_actualizar(self):
+        ticket = self.env['ir.config_parameter'].sudo().get_param('your.ticket.parameter')
+        codigos_externos = self.obtener_licitaciones_hoy(ticket)
+        keywords = self.keywords
+        self.obtener_licitaciones_gas(codigos_externos, ticket, keywords)
+
     """
     =================================================================
                         FUNCIONES AUXILIARES
@@ -832,17 +892,13 @@ class Licitacion(models.Model):
         Retornara la lista de aquellas licitaciones'''
         # Obtener la fecha de hoy
         fecha_actual = datetime.date.today()
-        print(f"fecha_actual: {fecha_actual}")
 
         # Calcular la fecha del lunes de la semana anterior
         delta_dias = (fecha_actual.weekday()) % 7  # 0 para lunes, 1 para martes, ..., 6 para domingo
-        print(f"delta_dias: {delta_dias}")
         fecha_lunes_semana_anterior = fecha_actual - datetime.timedelta(days=delta_dias, weeks=1)
-        print(f"fecha_lunes_semana_anterior: {fecha_lunes_semana_anterior}")
 
         # Calcular la fecha del domingo de la semana anterior
         fecha_domingo_semana_anterior = fecha_lunes_semana_anterior + datetime.timedelta(days=6)
-        print(f"fecha_domingo_semana_anterior: {fecha_domingo_semana_anterior}")
 
         '''
             TODO Falta por agregar la lógica que busque todas aquellas licitaciones que X variable de fecha este dentro de lunes-domingo semana anterior y la agregue a un listado
@@ -856,6 +912,11 @@ class Licitacion(models.Model):
         Segundo, crea una lista con los rut_unidad en la vista RANKING_V1.
         Tercero, recorre esa lista y para los primeros 20 elementos asigna de forma secuencial el ranking.
         '''
+        _logger.info("-" * 100)
+        _logger.info("-" * 100)
+        _logger.info("COMENZANDO LA EJECUCIÓN CALCULO RANKING")
+        _logger.info("-" * 100)
+        _logger.info("-" * 100)
 
         # Limpiar todos los valores del campo "ranking" en el modelo UnidadCompra
         self.env.cr.execute("UPDATE licibot_unidad_compra SET ranking = NULL;")
@@ -868,7 +929,7 @@ class Licitacion(models.Model):
         pos_ranking = 1
 
         # Recorrer los primeros 20 elementos de la lista
-        for id_unidad in id_unidad_list[:20]:
+        for id_unidad in id_unidad_list[:20]: # Será parámetro 20
 
             # Buscar y actualizar el campo "ranking" en el modelo UnidadCompra
             unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('id', '=', id_unidad)])
@@ -876,6 +937,10 @@ class Licitacion(models.Model):
             
             # Incrementar el contador de ranking para el siguiente valor
             pos_ranking += 1
+
+    def get_fecha_actual(self):
+        fecha_actual = fields.Date.today()
+        return fecha_actual
 
     """
     =================================================================
@@ -888,15 +953,14 @@ class Licitacion(models.Model):
 
         url = 'http://173.255.243.74:8069/token'
         response = requests.get(url)
+        _logger.info(response.status_code)
 
         if response.status_code == 200:
             token = response.text 
-            _logger.info(f"\n TOKEN {token}")
             return token
         else:
-            _logger.error(f"\n Error al obtener el token. Código de estado: {response.status_code}")
+            _logger.info(f"\n Error al obtener el token. Código de estado: {response.status_code}")
             return None
-
 
     def ol_crm_craft_json (self, codigo_externo, nombre_licitacion, tipo_licitacion, descripcion_licitacion, nombre_contacto, cargo_contacto, fecha_cierre):
         '''Función que arma un json con los parametros que recibe'''
@@ -933,70 +997,110 @@ class Licitacion(models.Model):
         '''De momento dado que la api de mercadopublico sigue caída lo que se quiere es que teniendo en consideración el ranking, se busque y se envie al CRM
         la información de la última licitación registrada en la base de datos para cada una de esas unidades de compra dentro del ranking (20 en total)'''
 
-        _logger.info("-" * 50)
-        _logger.info("CRON CRM")
-        _logger.info("-" * 50)
-        # Listar las id de unidades de compra de la vista RANKING_V1
-        self.env.cr.execute('SELECT "ID Unidad de Compra" FROM RANKING_V1;')
+        _logger.info("-" * 100)
+        _logger.info("-" * 100)
+        _logger.info("COMENZANDO LA EJECUCIÓN DE ENVIO INFORMACIÓN API CRM")
+        _logger.info("-" * 100)
+        _logger.info("-" * 100)
+
+        # Listar las id de unidades de compra rankeadas
+        self.env.cr.execute('SELECT id FROM licibot_unidad_compra ORDER BY ranking ASC;')
         id_unidad_list = list(line[0] for line in self.env.cr.fetchall())
 
-        n = 1
-
+        # Obtener token de la api crm
         token = self.ol_crm_get_token()
-        _logger.info(f"\n TOKEN {token}")
+        _logger.info(token)
 
-        for id_unidad in id_unidad_list[:20]:
-            query = f'''
-            SELECT  
-                licibot_unidad_compra.id, 
-                licibot_licitacion.codigo_externo,
-                licibot_licitacion.nombre,
-                licibot_tipo_licitacion.id,
-                licibot_tipo_licitacion.id_tipo_licitacion,
-                licibot_licitacion.descripcion,
-                licibot_licitacion.nom_contacto,
-                licibot_licitacion.cargo_contacto,
-                CASE 
-                    WHEN licibot_licitacion.fecha_cierre_1 IS NULL THEN TO_CHAR(licibot_licitacion.fecha_cierre_2,'YYYY-MM-DD')
-                    ELSE TO_CHAR(licibot_licitacion.fecha_cierre_1,'YYYY-MM-DD') 
-                END AS fecha_cierre,
-                licibot_unidad_compra.ranking
-            FROM licibot_unidad_compra 
-            JOIN licibot_licitacion ON licibot_unidad_compra.id = licibot_licitacion.unidad_compra_id 
-            JOIN licibot_tipo_licitacion ON licibot_licitacion.tipo_licitacion_id = licibot_tipo_licitacion.id
-            WHERE licibot_unidad_compra.id = {id_unidad} 
-            AND licibot_licitacion.fecha_creacion = (
-                SELECT MAX(fecha_creacion) FROM licibot_unidad_compra 
+        # Recorrer la lista de ids de unidades de compra rankeadas
+        for id_unidad in id_unidad_list[:20]: # Será parámetro 20
+            
+            query_ultima_oportunidad = f'''
+            SELECT CAST(create_date AS DATE) FROM crm_lead WHERE bidding_number LIKE '%{id_unidad}%';
+            '''
+            self.env.cr.execute(query_ultima_oportunidad)
+            fecha_ultima_oportunidad = self.env.cr.fetchone()
+
+            fecha_actual = datetime.date.today()
+            _logger.info(f"# # # # Tipo fecha_actual: {type(fecha_actual)} Valor {fecha_actual} # # # # ")
+            diferencia_dias = 180              # Será parámetro
+
+            # Cuando exista la fecha de ultima oportunidad la calcula, caso contrario asigna un valor a la diferencia para entender que no existen registros de esa unidad de compra
+            if fecha_ultima_oportunidad:
+                _logger.info(f"# # # # Tipo fecha ultima oportunidad: {type(fecha_ultima_oportunidad)} Valor {fecha_ultima_oportunidad} # # # # ")
+                fecha_ultima_oportunidad = datetime.date(fecha_ultima_oportunidad[0].year, fecha_ultima_oportunidad[0].month, fecha_ultima_oportunidad[0].day)
+                _logger.info(f"# # # # Tipo fecha ultima oportunidad (DESPUES): {type(fecha_ultima_oportunidad)} Valor {fecha_ultima_oportunidad} # # # # ")
+                diferencia = int((fecha_actual - fecha_ultima_oportunidad).total_seconds() / 60 / 60 / 24)
+            else:
+                diferencia = 9999999
+
+            # Si han pasado "diferencia_dias" desde la última oportunidad ingresada para la unidad de compra... Caso contrario la ignora
+            if (diferencia > diferencia_dias):
+
+                # Query para obtener los datos de la unidad de compra
+                query_datos = f'''
+                SELECT  
+                    DISTINCT(licibot_unidad_compra.id), 
+                    licibot_unidad_compra.nombre_unidad,
+                    licibot_licitacion.nom_contacto,
+                    licibot_licitacion.cargo_contacto,
+                    licibot_unidad_compra.ranking
+                FROM licibot_unidad_compra 
                 JOIN licibot_licitacion ON licibot_unidad_compra.id = licibot_licitacion.unidad_compra_id 
+                JOIN licibot_item_licitacion ON licibot_item_licitacion.licitacion_id = licibot_licitacion.id
                 WHERE licibot_unidad_compra.id = {id_unidad}
-            );
-            '''
-            _logger.info(f"\n Licitación {n}")
+                AND licibot_licitacion.fecha_creacion = (
+                    SELECT MAX(fecha_creacion) FROM licibot_unidad_compra 
+                    JOIN licibot_licitacion ON licibot_unidad_compra.id = licibot_licitacion.unidad_compra_id 
+                    WHERE licibot_unidad_compra.id = {id_unidad}
+                    );
+                '''
+                self.env.cr.execute(query_datos)
+                resultado = self.env.cr.fetchone()
 
-            self.env.cr.execute(query)
-            resultado = self.env.cr.fetchone()
-            _logger.info(f"""\n Resultado = (Codigo Externo = {resultado[1]}, 
-            Nombre Licitacion = {resultado[2]}, 
-            Tipo Licitacion = {resultado[4]}, 
-            Descripcion = {resultado[5]}, 
-            Nombre Contacto = {resultado[6]}, 
-            Cargo Contacto = {resultado[7]}, 
-            Fecha Cierre = {resultado[8]})""")
-            
-            json = self.ol_crm_craft_json(resultado[1], resultado[2], resultado[4], resultado[5], resultado[6], resultado[7], resultado[8])
-            '''
-            BUG Campo Descripción demaciado extenso
-            ERROR: index row size 3168 exceeds maximum 2712 for index "crm_lead_name_index"
-            HINT:  Values larger than 1/3 of a buffer page cannot be indexed.
-            Consider a function index of an MD5 hash of the value, or use full text indexing.
-            '''
-            
-            url = 'http://173.255.243.74:8069/licitaciones'
-            headers = {'Authorization': token}
-            response = requests.post(url, headers=headers, json=json)
-            
-            _logger.info(f"Respuesta de API CRM: Código {response.status_code}")
-            n += 1
+                # Query para calcular el monto diferencial de la unidad de compra
+                query_monto_diferencial = f'''
+                SELECT 
+                    SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2022-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2022-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) -
+                    SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2023-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2023-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) AS "Monto Diferencial"
+                FROM 
+                    licibot_unidad_compra 
+                    JOIN licibot_licitacion ON licibot_unidad_compra.id = licibot_licitacion.unidad_compra_id
+                    JOIN licibot_item_licitacion ON licibot_licitacion.id = licibot_item_licitacion.licitacion_id
+                WHERE 
+                    licibot_unidad_compra.id = {id_unidad}
+                GROUP BY 
+                    licibot_unidad_compra.id
+                ORDER BY
+                    "Monto Diferencial" DESC;
+                '''
+                self.env.cr.execute(query_monto_diferencial)
+                resultado2 = self.env.cr.fetchone()
+
+                # Pre-armado de datos a enviar
+                fecha_actual = datetime.date.today()
+                id_unidad = resultado[0]
+                nombre_unidad = resultado[1]
+                monto_por_licitar = resultado2[0]
+                nombre_contacto = resultado[2]
+                cargo_contacto = resultado[3]
+                margen_días = 5                         # Será parámetro
+
+                # Armado de json con datos a enviar
+                json = self.ol_crm_craft_json (
+                    f"{id_unidad} - {fecha_actual}",                                                                                             # CodigoExterno: Id Unidad de Compra + Fecha Actual.
+                    " ",                                                                                                                         # Tipo: Dejar en blanco o crear un valor para un "Sin Tipo".
+                    f"{nombre_unidad} + Monto de gas por licitar {locale.currency(monto_por_licitar, grouping=True)} al {fecha_actual}",         # Nombre: "Nombre Cliente" + "Monto Gas por Licitar $ al " + Fecha Actual.
+                    f"{nombre_unidad} + Monto de gas por licitar {locale.currency(monto_por_licitar, grouping=True)} al {fecha_actual}",         # Descripción: Repetir lo de campo nombre.
+                    nombre_contacto,                                                                                                             # Nombre Usuario: Tomar el nombre desde la última licitación.
+                    cargo_contacto,                                                                                                              # Cargo Usuario: Tomar el cargo desde la última licitación.
+                    (fecha_actual + datetime.timedelta(days = margen_días)).strftime('%Y-%m-%d'))                                                # Fecha Cierre: Tomar fecha de hoy + X días (parámetro).
+                
+                # Envio de información al CRM acorde a las instrucciones de Fco.
+                url = 'http://173.255.243.74:8069/licitaciones'
+                headers = {'Authorization': token}
+                response = requests.post(url, headers=headers, json=json)
+                
+                _logger.info(f"Respuesta de API CRM: Código {response.status_code}")
 
 class ProductoServicio (models.Model):
     _name = 'licibot.producto.servicio'
