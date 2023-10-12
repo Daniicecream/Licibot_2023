@@ -1,23 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <record id="res_config_settings_view_form_inherit_licibot" model="ir.ui.view">
-        <field name="name">res.config.settings.view.form.inherit.licibot</field>
+    <record id="res_config_settings_view_form_licibot" model="ir.ui.view">
+        <field name="name">res.config.settings.view.licibot</field>
         <field name="model">res.config.settings</field>
-        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//div[@name='integration']" position="after">
-                <h2>Licibot</h2>
-                <div class="content-group mt16" name="licibot">
-                    <group>
-                        <label for="token_api_mp"/>
-                        <div>
-                            <field name="token_api_mp"/>
+            <xpath expr="//div[hasclass('settings')]" position="inside">
+                
+
+
+                <div class="app_settings_block" data-string="Licibot" string="Licibot" data-key="licibot">
+
+                    <h2>Configuraciones API Mercado Público</h2>
+                    <div class="row mt16 o_settings_container" id="licibot_setting">
+                        <div class="col-xs-12 col-lg-12 o_setting_box">
+                            <div class="o_setting_left_pane"> 
+                            </div>
+                            <div class="o_setting_right_pane"> 
+                                <label class= "o_form_label col-lg-3 o_light_label" for="token_api_mp"/> 
+                                <input class="o_field_char o_field_widget o_input" name="token_api_mp"/>
+                            </div>
                         </div>
-                    </group>
-                </div>
+                    </div>
+
+                    <h2>Configuraciones para el Ranking</h2>
+                    <div class="row mt16 o_settings_container" id="sub_menu_2_setting">
+
+                        <div class="col-xs-12 col-md-12 o_setting_box">
+                            <div class="o_setting_left_pane">
+                            </div>
+                            <div class="o_setting_right_pane">
+                            </div>
+                        </div>
+
+                        <div class="col-xs-12 col-md-12 o_setting_box">
+                            <div class="o_setting_left_pane">
+                            </div>
+                            <div class="o_setting_right_pane">
+                            </div>
+                        </div>
+                    </div>
+
+                </div> 
+
+
+
             </xpath>
         </field>
     </record>
-    
+
+    <record id="licibot_config_setting_action" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">res.config.settings</field>
+        <!-- <field name="view_id" ref="view_knowledge_configuration"/> -->
+        <field name="view_mode">form</field>
+        <field name="target">inline</field>
+        <field name="context">{'module': 'licibot'}</field>
+    </record>
+
+    <menuitem id="licibot_config_settings_menu"
+              name="Settings"
+              parent="crm.crm_menu_config"
+              sequence="0"
+              action="licibot_config_setting_action"
+              groups="base.group_system"/>
+
 </odoo>
