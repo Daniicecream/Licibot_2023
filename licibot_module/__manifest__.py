@@ -7,8 +7,8 @@
         
         Adicionalmente, permite 'rankear' a las unidades de compra según ciertos criterios.
     ''',
-    'author': 'Daniel V., Ricardo A., Esteban S.',
-    'version': '1.0.0',
+    'author': 'Daniel V., Ricardo A., Esteban S., Nicolas P.',
+    'version': '0.1.0',
     'website': '',
     'depends': ['crm', 'opens_licitacion_crm'],
     'external_dependencies': {'python': ['pandas', 'requests']},

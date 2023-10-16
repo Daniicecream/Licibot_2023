@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="crm_case_form_view_leads_inherit" model="ir.ui.view">
+        <field name="name">crm.lead.biddings</field>
+        <field name="model">crm.lead</field>
+        <field name="priority" eval="25"/>
+        <field name="inherit_id" ref="crm.crm_case_form_view_leads"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='type']" position="after">
+                <field name="bidding"/>
+            </xpath>
+            <xpath expr="//page[@name='extra']" position="after">
+            	<page name="bidding" string="Datos licitación" attrs="{'invisible':[('bidding', '=', False)]}">
+                    <group>
+                        <group>
+                            <field name="portal"/>
+                            <field name="bidding_number"/>
+                            <field name="bidding_link"/>
+                            <field name="bidding_type"/>
+                        </group>
+                        <group>
+                            <field name="bases_file"/>
+                            <field name="other_files"/>
+                        </group>
+                        <group>
+                            <field name="bidding_name"/>
+                            <field name="services_description"/>
+                        </group>
+                    </group>
+                </page>
+
+                <page name="contacts" string="Contactos licitación" attrs="{'invisible':[('bidding', '=', False)]}">
+                    <group>
+                        <field name="bidding_contact">
+                            <tree string="Contactos licitación" editable="bottom" delete="true">
+                                <field name="lead_id" invisible="1"/>
+                                <field name="contact_name"/>
+                                <field name="contact_position"/>
+                                <field name="contact_info"/>
+                            </tree>
+                        </field>
+                    </group>
+                </page>
+
+                <page name="timeline" string="Cronograma licitación" attrs="{'invisible':[('bidding', '=', False)]}">
+                    <group>
+                        <field name="bidding_timeline">
+                            <tree string="Cronograma licitación" editable="bottom" delete="true">
+                                <field name="lead_id" invisible="1"/>
+                                <field name="timeline_activity"/>
+                                <field name="timeline_date"/>
+                                <field name="timeline_status"/>
+                            </tree>
+                        </field>
+                    </group>
+                </page>
+
+                <page name="anexxes" string="Anexos licitación" attrs="{'invisible':[('bidding', '=', False)]}">
+                    <group>
+                        <field name="bidding_anexxes">
+                            <tree string="Anexos licitación" editable="bottom" delete="true">
+                                <field name="lead_id" invisible="1"/>
+                                <field name="anex_name"/>
+                                <field name="anex_title"/>
+                                <field name="anex_deadline"/>
+                                <field name="anex_format"/>
+                                <field name="anex_details"/>
+                                <field name="anex_status"/>
+                            </tree>
+                        </field>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+
+    <record id="crm_case_form_view_oppor_inherit" model="ir.ui.view">
+        <field name="name">crm.lead.biddings</field>
+        <field name="model">crm.lead</field>
+        <field name="priority" eval="25"/>
+        <field name="inherit_id" ref="crm.crm_case_form_view_oppor"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='team_id']" position="after">
+                <field name="bidding"/>
+            </xpath>
+            <xpath expr="//page[@name='lead']" position="after">
+                <page name="bidding" string="Datos licitación" attrs="{'invisible':[('bidding', '=', False)]}">
+                    <group>
+                        <group>
+                            <field name="portal"/>
+                            <field name="bidding_number"/>
+                            <field name="bidding_link"/>
+                            <field name="bidding_type"/>
+                        </group>
+                        <group>
+                            <field name="bases_file"/>
+                            <field name="other_files"/>
+                        </group>
+                        <group>
+                            <field name="bidding_name"/>
+                            <field name="services_description"/>
+                        </group>
+                    </group>
+                </page>
+
+                <page name="contacts" string="Contactos licitación" attrs="{'invisible':[('bidding', '=', False)]}">
+                    <group>
+                        <field name="bidding_contact">
+                            <tree string="Contactos licitación" editable="bottom" delete="true">
+                                <field name="lead_id" invisible="1"/>
+                                <field name="contact_name"/>
+                                <field name="contact_position"/>
+                                <field name="contact_info"/>
+                            </tree>
+                        </field>
+                    </group>
+                </page>
+
+                <page name="timeline" string="Cronograma licitación" attrs="{'invisible':[('bidding', '=', False)]}">
+                    <group>
+                        <field name="bidding_timeline">
+                            <tree string="Cronograma licitación" editable="bottom" delete="true">
+                                <field name="lead_id" invisible="1"/>
+                                <field name="timeline_activity"/>
+                                <field name="timeline_date"/>
+                                <field name="timeline_status"/>
+                            </tree>
+                        </field>
+                    </group>
+                </page>
+
+                <page name="anexxes" string="Anexos licitación" attrs="{'invisible':[('bidding', '=', False)]}">
+                    <group>
+                        <field name="bidding_anexxes">
+                            <tree string="Anexos licitación" editable="bottom" delete="true">
+                                <field name="lead_id" invisible="1"/>
+                                <field name="anex_name"/>
+                                <field name="anex_title"/>
+                                <field name="anex_deadline"/>
+                                <field name="anex_format"/>
+                                <field name="anex_details"/>
+                                <field name="anex_status"/>
+                            </tree>
+                        </field>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

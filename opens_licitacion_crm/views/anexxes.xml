@@ -1,0 +1,28 @@
+<odoo>
+    <data>
+        <record id="crm_lead_anexxes_action" model="ir.actions.act_window">
+            <field name="name">Anexos Licitación</field>
+            <field name="res_model">crm.lead.anexxes</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[]</field>
+        </record>
+
+        <record id="crm_lead_anexxes_tree_view" model="ir.ui.view">
+            <field name="name">crm.lead.anexxes.tree.view</field>
+            <field name="model">crm.lead.anexxes</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="portal"/>
+                    <field name="bidding_number"/>
+                    <field name="bidding_name"/>
+                    <field name="anex_name"/>
+                    <field name="anex_title"/>
+                    <field name="anex_deadline"/>
+                    <field name="anex_format"/>
+                    <field name="anex_details"/>
+                    <field name="anex_status"/>
+                </tree>
+            </field>
+        </record>
+    </data>
+</odoo>

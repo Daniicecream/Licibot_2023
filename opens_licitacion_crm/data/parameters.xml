@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding='UTF-8'?>
+<odoo>
+	<data>
+		<record id="token_hours_due" model="ir.config_parameter">
+		   <field name="key">crm.horas_token</field>
+		   <field name="value">1</field>
+		</record>
+	</data>
+</odoo>

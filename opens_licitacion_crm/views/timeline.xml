@@ -1,0 +1,26 @@
+<odoo>
+    <data>
+        <record id="crm_lead_timeline_action" model="ir.actions.act_window">
+            <field name="name">Cronogramas Licitación</field>
+            <field name="res_model">crm.lead.timeline</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[]</field>
+        </record>
+
+        <record id="crm_lead_timeline_tree_view" model="ir.ui.view">
+            <field name="name">crm.lead.timeline.tree.view</field>
+            <field name="model">crm.lead.timeline</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="lead_id" invisible="1"/>
+                    <field name="portal"/>
+                    <field name="bidding_number"/>
+                    <field name="bidding_name"/>
+                    <field name="timeline_activity"/>
+                    <field name="timeline_date"/>
+                    <field name="timeline_status"/>
+                </tree>
+            </field>
+        </record>
+    </data>
+</odoo>

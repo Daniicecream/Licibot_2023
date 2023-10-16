@@ -1,0 +1,10 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_crm_lead_bidding_portal,crm.lead.bidding.portal,model_crm_lead_bidding_portal,,1,1,1,1
+access_crm_lead_bidding_type,crm.lead.bidding.type,model_crm_lead_bidding_type,,1,1,1,1
+access_crm_lead_bidding_activity,crm.lead.bidding.activity,model_crm_lead_bidding_activity,,1,1,1,1
+access_crm_lead_bidding_status,crm.lead.bidding.status,model_crm_lead_bidding_status,,1,1,1,1
+access_crm_lead_bidding_format,crm.lead.bidding.format,model_crm_lead_bidding_format,,1,1,1,1
+access_crm_lead_contact,crm.lead.contact,model_crm_lead_contact,,1,1,1,1
+access_crm_lead_timeline,crm.lead.timeline,model_crm_lead_timeline,,1,1,1,1
+access_crm_lead_anexxes,crm.lead.anexxes,model_crm_lead_anexxes,,1,1,1,1
+access_crm_api_token,crm.api.token,model_crm_api_token,,1,1,1,1

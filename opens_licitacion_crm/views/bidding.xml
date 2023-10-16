@@ -1,0 +1,24 @@
+<odoo>
+    <data>
+        <record id="crm_lead_bidding_action" model="ir.actions.act_window">
+            <field name="name">Licitaciones</field>
+            <field name="res_model">crm.lead</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[('bidding', '=', True)]</field>
+        </record>
+
+        <record id="crm_lead_bidding_tree_view" model="ir.ui.view">
+            <field name="name">crm.lead.bidding.tree.view</field>
+            <field name="model">crm.lead</field>
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="portal"/>
+                    <field name="bidding_number"/>
+                    <field name="bidding_type"/>
+                    <field name="bidding_name"/>
+                    <field name="date_closed" string="Cierre previsto"/>
+                </tree>
+            </field>
+        </record>
+    </data>
+</odoo>
