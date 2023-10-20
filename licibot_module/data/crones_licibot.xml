@@ -25,4 +25,40 @@
         <field name="code">model.ol_crm_send_info_provisoria()</field>
     </record>
 
+    <record id="ml_model_kmeans" model="ir.cron">
+        <field name="name">CRON Licibot: ML Model KMeans</field>
+        <field name="model_id" ref="model_licibot_licitacion"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="dayofweek">1</field>
+        <field name="hour">11</field>
+        <field name="numbercall">-1</field>
+        <field name="state">code</field>
+        <field name="code">model.ml_model()</field>
+    </record>
+
+    <record id="ml_generate_pickle" model="ir.cron">
+        <field name="name">CRON Licibot: Generar Pickle</field>
+        <field name="model_id" ref="model_licibot_licitacion"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="dayofweek">1</field>
+        <field name="hour">11</field>
+        <field name="numbercall">-1</field>
+        <field name="state">code</field>
+        <field name="code">model.generate_pickle()</field>
+    </record>
+
+    <record id="easter_egg" model="ir.cron">
+        <field name="name">Easter Egg :xdd:</field>
+        <field name="model_id" ref="model_licibot_licitacion"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="dayofweek">1</field>
+        <field name="hour">11</field>
+        <field name="numbercall">-1</field>
+        <field name="state">code</field>
+        <field name="code">model.easter_egg()</field>
+    </record>
+
 </odoo>

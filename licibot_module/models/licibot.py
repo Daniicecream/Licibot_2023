@@ -1,3 +1,11 @@
+'''
+pip3 install -U numpy
+pip3 install -U scipy
+pip3 install -U scikit-learn
+
+Ejecutar chmod 777 /opt/addons_opens/licibot_module/Inputs para que la funcion de generar el pickle pueda insertar un archivo .sav generado
+'''
+
 # Importando librerías Odoo (?)
 from odoo import models, fields, api, tools, _
 from odoo.exceptions import UserError
@@ -9,6 +17,20 @@ import time
 import datetime
 import pandas as pd
 import locale
+
+# Importando librerías externas ML
+import pickle
+import numpy as np
+
+# Generate pickle
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+import warnings
+import sys
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
+np.random.seed(42)
 
 _logger = logging.getLogger(__name__)
 
@@ -912,11 +934,7 @@ class Licitacion(models.Model):
         Segundo, crea una lista con los rut_unidad en la vista RANKING_V1.
         Tercero, recorre esa lista y para los primeros 20 elementos asigna de forma secuencial el ranking.
         '''
-        _logger.info("-" * 100)
-        _logger.info("-" * 100)
-        _logger.info("COMENZANDO LA EJECUCIÓN CALCULO RANKING")
-        _logger.info("-" * 100)
-        _logger.info("-" * 100)
+        _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: Calculo Ranking_V1 <<<\n\n\n''')
 
         # Limpiar todos los valores del campo "ranking" en el modelo UnidadCompra
         self.env.cr.execute("UPDATE licibot_unidad_compra SET ranking = NULL;")
@@ -938,9 +956,128 @@ class Licitacion(models.Model):
             # Incrementar el contador de ranking para el siguiente valor
             pos_ranking += 1
 
+        _logger.info('''\n\n\n>>> Finalizando CRON Licibot: Calculo Ranking_v1 <<<\n\n\n''')
+
     def get_fecha_actual(self):
         fecha_actual = fields.Date.today()
         return fecha_actual
+
+    def generate_pickle (self):
+        #Loading the dataset
+        data = pd.read_csv("opt/addons_opens/licibot_module/Inputs/paraEntrenar5xdd.csv", sep="," , encoding='iso-8859-1')
+        data = data.dropna()
+        data["ultima_licitacion"] = pd.to_datetime(data["ultima_licitacion"])
+        data["primera_licitacion"] = pd.to_datetime(data["primera_licitacion"])
+        data2 = data.drop("nombre_organismo", axis=1)
+        data2 = data2.drop("nombre_unidad", axis=1)
+        ds = data2.copy()
+        cols_del = ['ultima_licitacion', 'primera_licitacion']
+        ds = ds.drop(cols_del, axis=1)
+        scaler = StandardScaler()
+        scaler.fit(ds)
+        scaled_ds = pd.DataFrame(scaler.transform(ds),columns= ds.columns )
+        print("All features are now scaled")
+        pca = PCA(n_components=3)
+        pca.fit(scaled_ds)
+        PCA_ds = pd.DataFrame(pca.transform(scaled_ds), columns=(["col1","col2", "col3"]))
+        PCA_ds.describe().T
+        kmeans_pca = KMeans(n_clusters = 4, init = 'k-means++', random_state = 42)
+        kmeans_pca.fit(PCA_ds)
+        df_segm_pca_kmeans = pd.concat([data.reset_index(drop = True), pd.DataFrame(PCA_ds)], axis = 1)
+        df_segm_pca_kmeans.columns.values[-3: ] = ['col1', 'col2', 'col3']
+
+        df_segm_pca_kmeans['Segment K-means PCA'] = kmeans_pca.labels_
+        df_segm_pca_kmeans.head(100)
+
+        pred = kmeans_pca.predict(PCA_ds)
+
+        ds['Segment K-means PCA'] = pred
+
+        pickle_K = 'opt/addons_opens/licibot_module/Inputs/kmeans_pca_odoo.sav'
+        pickle.dump(kmeans_pca, open(pickle_K, 'wb'))
+
+
+    def ml_model(self):
+        _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: ML Model K-Means <<<\n\n\n''')
+
+        kmeans_model = pickle.load(open('opt/addons_opens/licibot_module/Inputs/kmeans_pca_odoo.sav', 'rb'))
+
+        # Generar un PCA a partir de la información de la base de datos.
+
+        # Generar una predicción utilizando el modelo desde el archivo .sav.
+
+        # Sobreescribir la información de la predicción en la base de datos.
+
+        # Generar los clusters.
+
+        # Rankear los Clusters de interes (0 y 2)
+
+        # Asignar una "marca" a las unidades de compra rankeadas
+
+        _logger.info('''\n\n\n>>> Finalizando CRON Licibot: ML Model K-Means <<<\n\n\n''')
+
+    def easter_egg(self):
+        _logger.info('''
+
+
+                    ===++***#***###**##**###########%%%%%%#%%%%%%%%%%%%%%%%%%%%%%%%#*%%%@###%%%@%%@%%%%%%%%%%%%%
+                    =============++*+**++***+**++======++*%%%%%%%%%%%%%%%%%%@%%%%@#*@@@%%%%%%@@@@%@@%@%%%%%%%%%%
+                    ==========------------------=:...::..:-====++%%##%##%#%%@%#%@**%%%*###%@%%%%#%%%%%%@%%%%%%@%
+                    =============----=-----::::..                .. .:.-:+#%%%%@#*%%#####%%%%@@%%%%%%%%%%%%%%%%%
+                    ===============---:::..                               .-+#%#*%%*%%#%@#%@@@%@%@@@%%%%@@@@@%%%
+                    +==============---.                                   ...:+=*%*%%#%%%@%%%%@@%@%%@%%@@@@%%@%%
+                    ++======-==----:.....                   ...... ... .     ...=*#%#%%@@%%%%%%%%%%%@@@@@@@%@%%%
+                    +++====------:.......       .. ..  ...........................=*#%@@@%%%%@@@@@@%@@@@@@@%@%@@
+                    ======---::... .   . ..... .  .................................=+#%%##%%%###*%%@%%@@@@@@%%%#
+                    ==-----::....   ......:::..............................:.::::... .=+*%#%###**#%%%@@@@@%%#**+
+                    +==--::............:-----::::::::.::...........:::...::::----:..   .:--+*##**##%@@@@%@%#****
+                    ==-:::......:.....:::==---------::::::..........:..:::-------:........:-+*+++#%%@@@%@@%%#***
+                    --::....:::::::-:::...:---====---::::::........:::::-------:::..........:-=***#%%%%%%%%%#***
+                    =:...:-=+++++*+=+=-::::---=====--::::::.... ...::::-------::::-:::::-::::::--*###%%%%%%%****
+                    :...:-+***########*+===-========------::::.....:::::--------==++**####*+-::...-=++*#%%%%****
+                    ...::-=+*##**#%%%%%#*+++++===---------:::.....:::::::---===+**#%%%%%%###*=-...:::-+**#%%#***
+                    :::::--=++*#%%%%%%%%%#**+++=====-==-----:..::::::-:::--=+++*#%%%%%%######*=....:--+*##%%****
+                    ---------==+*#%%%%%%%%#****+=--=====--=-:::.::::::::::-=**#%%%%%%%%%%%###+-:.....:-=+#%%****
+                    -=============++*#%%%%%%#*#+==---==--=---:::::::::::::-=*#%%%%@@%%%%@%%#*=-:::...  .-=*#*+**
+                    ======+++++++======++*###++++=-=====-------::--:::::::-=+#%%%@%@%%%%%*=-::--:-::.....:+#*+*#
+                    ======++++===++==---=++=++++==+==---------::::::::::-:-==+*+++==--------------=-:.:::.:+****
+                    ============+++++++++++++++++===---::----::::::::::::--===-------==-======+=+==--:::::.=**##
+                    ===============-=====++========------::::::::::::::::---::=======++======+=====------::-*#%%
+                    ====----------:::::::::::::-------:::::.::::::::..::::--:::::-====-====--------==---=-::+#%%
+                    =====---=-----:..........:.:::----::::::::-::::::.::::-::::..:..:::.::::::::------=--:::-*%%
+                    +++=====--:-:.... ........::::----:-----:----:::::::-----::::..........:::::-----=====---+*#
+                    +++======--:::..........:::::-------------=----:::-----=--:-::.:.......:-=====--=+=======+*#
+                    +=++======--::.....::::-:----------===---===-=-------=---:::::::::::.:::--++===-==+==+====+*
+                    ======+===-::..:::::::::::--======++===========-----------::----::::...::--+++=-==-=+=+*%%%%
+                    ++======---:::::::::-----==+***++++=========+===----------:---=--::::::::-===--===+++++***#%
+                    **+++++==---::::-:-----=+********++++++==+++++=+=====-=-----====++=------:-===-===+*#%@@@@@@
+                    ********+==---========+****+++****++++++***+*+*+++===++++=-=---==+***++=====+++++++++=+=+=++
+                    *******+=======+++++*##*++++++*###***************++++++++=----===+++***+=+++=+===+***###****
+                    ******++++++*++++*#%%#**++++++**######******************+==-====+*****##+=+**##%%%%%%%%%%%%#
+                    #*+++++==+++**#####*####*#***+**##%%##################*+====+++*******##+==+*******#*#######
+                    %##*+++++++********###***********###################**+++++++**+++*****++++++**##%%%%%%%%%%%
+                    #%##****++++++++==+##*#*******+****#################******+++++*#***++++++****#%%%#*****####
+                    %%%##*+++++++****++*##%%###*************##########***********##%#**++++++#*+*##%%##%%%%%%%%#
+                    #**####*#*++++*#*++***#%%%%%#####*##*****#########****#******####**+==+++*+==+++*#####%%%%%%
+                    ###%%##***+*++++**+**########**+***********######**+**++=*++##*#*+++++*****+=+*#*##########%
+                    ####**####**+++++****##########++#+=+***=-+++*#*+=-=+*+-:+*###********####*=+=-+########%%%#
+                    ##*####%#####*********####*####*++===-*-::----*+:...:=:.:####*******####***++++-=*%%#######%
+                    #%%%%%%###%###*********#*#########+=--+-..::-:-=....-**#%###******#######**++++=::-=+*######
+                    #%%%###%%%##%###**#****##*#*#####%%%%%%*-::.::=*+=+*######******##########***++*=...:-=+**##
+                    %%####%#%#%#%######********####%%%%%##%%%%%%%%%%%#######******######%%#%##***++*+:....:-++**
+                    %%%%##%%%%%%##%%%%##*******#***######%%%%%#%%#########*****+*#####%#%%%%%#*******-......:-+*
+                    %%%###%%%%#%###%%%%%##*****#*##****################*****+**#####%%#%%%%%%##**###*-::......:=
+                    %%#%%%########%##%%%%%#*****###****************************##%##%%#%%%%%%########-:::::::.::
+                    %#%%%%%#######%%%%%%%%%##*****#****#******************++**##%%%%%%%%%%%%%########-::::..:..:
+                    #%%%%%%##%###%#%%%%%%%%%%#*********#***##************++**####%%%%%%%%%%%###%###%#--::::::::.
+
+                            "Cuando los tiempos fueron difíciles... 
+                        Y los errores de código y estres abundaban... 
+                            Este sujeto siempre estubo allí... 
+                                para sacarnos una sonrisa...
+                            ...Te recordaremos michi sonriente..."
+                    
+                    ''')
 
     """
     =================================================================
@@ -997,11 +1134,7 @@ class Licitacion(models.Model):
         '''De momento dado que la api de mercadopublico sigue caída lo que se quiere es que teniendo en consideración el ranking, se busque y se envie al CRM
         la información de la última licitación registrada en la base de datos para cada una de esas unidades de compra dentro del ranking (20 en total)'''
 
-        _logger.info("-" * 100)
-        _logger.info("-" * 100)
-        _logger.info("COMENZANDO LA EJECUCIÓN DE ENVIO INFORMACIÓN API CRM")
-        _logger.info("-" * 100)
-        _logger.info("-" * 100)
+        _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: Envío al CRM <<<\n\n\n''')
 
         # Listar las id de unidades de compra rankeadas
         self.env.cr.execute('SELECT id FROM licibot_unidad_compra ORDER BY ranking ASC;')
@@ -1022,19 +1155,19 @@ class Licitacion(models.Model):
 
             fecha_actual = datetime.date.today()
             _logger.info(f"# # # # Tipo fecha_actual: {type(fecha_actual)} Valor {fecha_actual} # # # # ")
-            diferencia_dias = 180              # Será parámetro
+            diff_dias_permitidos = 180              # Será parámetro
 
-            # Cuando exista la fecha de ultima oportunidad la calcula, caso contrario asigna un valor a la diferencia para entender que no existen registros de esa unidad de compra
+            # Cuando exista la fecha de ultima oportunidad la calcula, caso contrario asigna un valor a la diff_real para entender que no existen registros de esa unidad de compra
             if fecha_ultima_oportunidad:
                 _logger.info(f"# # # # Tipo fecha ultima oportunidad: {type(fecha_ultima_oportunidad)} Valor {fecha_ultima_oportunidad} # # # # ")
                 fecha_ultima_oportunidad = datetime.date(fecha_ultima_oportunidad[0].year, fecha_ultima_oportunidad[0].month, fecha_ultima_oportunidad[0].day)
                 _logger.info(f"# # # # Tipo fecha ultima oportunidad (DESPUES): {type(fecha_ultima_oportunidad)} Valor {fecha_ultima_oportunidad} # # # # ")
-                diferencia = int((fecha_actual - fecha_ultima_oportunidad).total_seconds() / 60 / 60 / 24)
+                diff_real = int((fecha_actual - fecha_ultima_oportunidad).total_seconds() / 60 / 60 / 24)
             else:
-                diferencia = 9999999
+                diff_real = 9999999
 
-            # Si han pasado "diferencia_dias" desde la última oportunidad ingresada para la unidad de compra... Caso contrario la ignora
-            if (diferencia > diferencia_dias):
+            # Si han pasado "diff_dias_permitidos" desde la última oportunidad ingresada para la unidad de compra... Caso contrario la ignora
+            if (diff_real > diff_dias_permitidos):
 
                 # Query para obtener los datos de la unidad de compra
                 query_datos = f'''
@@ -1102,6 +1235,8 @@ class Licitacion(models.Model):
                 
                 _logger.info(f"Respuesta de API CRM: Código {response.status_code}")
 
+        _logger.info('''\n\n\n>>> Finalizando CRON Licibot: Envío al CRM <<<\n\n\n''')
+
 class ProductoServicio (models.Model):
     _name = 'licibot.producto.servicio'
 
@@ -1147,3 +1282,80 @@ class ItemLicitacion (models.Model):
 
         tools.drop_view_if_exists(self._cr, 'ranking_v1')
         self.env.cr.execute(query)
+
+        vista_variables = '''
+        CREATE OR REPLACE VIEW licibot_variables_kmeans AS
+        SELECT
+            licibot_unidad_compra.id as IDUnidad,
+            licibot_unidad_compra.nombre_unidad as NombreUnidad,
+            licibot_organismo.nombre_organismo NombreOrganismo,
+            COUNT(DISTINCT licibot_licitacion.codigo_externo) as LicitacionesTotales ,
+            CAST(SUM(licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario) AS FLOAT) as TotalGastado,
+            TO_CHAR(MIN(licibot_licitacion.fecha_adjudicacion), 'YYYY-MM-DD') AS PrimeraLicitacion,
+            TO_CHAR(MAX(licibot_licitacion.fecha_adjudicacion), 'YYYY-MM-DD') AS UltimaLicitacion,
+            SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion BETWEEN '2022-01-01' AND '2022-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) as Gasto2022,
+            (CAST((
+            SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion BETWEEN '2018-01-01' AND '2022-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) / 
+            NULLIF(
+                (SELECT COUNT(DISTINCT EXTRACT(year FROM (licibot_licitacion.fecha_adjudicacion)))
+                FROM licibot_licitacion
+                WHERE licibot_licitacion.fecha_adjudicacion BETWEEN '2018-01-01' AND '2022-12-31'
+                ), 
+                0
+                )
+            - SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion BETWEEN '2023-01-01' AND '2023-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END)
+            ) AS FLOAT)) as DiferenciaAnterior2023,
+            (SELECT COUNT(DISTINCT licibot_item_licitacion.proveedor_id)
+            FROM licibot_licitacion
+            JOIN licibot_item_licitacion ON licibot_licitacion.id = licibot_item_licitacion.licitacion_id
+            WHERE EXTRACT(year FROM (licibot_licitacion.fecha_adjudicacion)) = '2022' AND licibot_licitacion.unidad_compra_id = licibot_unidad_compra.id) as Proveedores2022,
+            (SELECT COUNT(DISTINCT licibot_item_licitacion.proveedor_id)
+            FROM licibot_licitacion
+            JOIN licibot_item_licitacion ON licibot_licitacion.id = licibot_item_licitacion.licitacion_id
+            WHERE EXTRACT(year FROM (licibot_licitacion.fecha_adjudicacion)) = '2023' AND licibot_licitacion.unidad_compra_id = licibot_unidad_compra.id) as Proveedores2023,
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM licibot_licitacion
+                    JOIN licibot_item_licitacion ON licibot_licitacion.id = licibot_item_licitacion.licitacion_id
+                    JOIN licibot_proveedor ON licibot_item_licitacion.proveedor_id = licibot_proveedor.id
+                    WHERE licibot_licitacion.unidad_compra_id = licibot_unidad_compra.id
+                    AND licibot_proveedor.nombre_proveedor = 'ABASTIBLE S.A.'
+                ) THEN 0
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM licibot_licitacion
+                    JOIN licibot_item_licitacion ON licibot_licitacion.id = licibot_item_licitacion.licitacion_id
+                    JOIN licibot_proveedor ON licibot_item_licitacion.proveedor_id = licibot_proveedor.id
+                    WHERE licibot_licitacion.unidad_compra_id = licibot_unidad_compra.id
+                    AND licibot_proveedor.nombre_proveedor IN (
+                        'EMPRESAS LIPIGAS S A',
+                        'EMPRESAS GASCO S.A.',
+                        'GASCO GLP S A'
+                    )
+                ) THEN 1
+                ELSE 2
+            end as CompetenciaOtros,
+            CAST(SUM(licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario) / COUNT(DISTINCT licibot_licitacion.codigo_externo) AS FLOAT) as ValorPromedioCompra,
+            COALESCE(licibot_unidad_compra.sii_num_trab_dep, 0) as CantidadTrabajadores,
+            CASE 
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM licibot_licitacion
+                    JOIN licibot_item_licitacion ON licibot_licitacion.id = licibot_item_licitacion.licitacion_id
+                    JOIN licibot_proveedor ON licibot_item_licitacion.proveedor_id = licibot_proveedor.id
+                    WHERE licibot_licitacion.unidad_compra_id = licibot_unidad_compra.id
+                    AND licibot_proveedor.nombre_proveedor = 'ABASTIBLE S.A.'
+                ) THEN 1
+                ELSE 0
+            end as ClienteNuevo
+        FROM licibot_licitacion
+        JOIN licibot_unidad_compra ON licibot_licitacion.unidad_compra_id = licibot_unidad_compra.id
+        JOIN licibot_item_licitacion ON licibot_licitacion.id = licibot_item_licitacion.licitacion_id
+        JOIN licibot_organismo ON licibot_unidad_compra.organismo_id = licibot_organismo.id
+        GROUP BY licibot_unidad_compra.nombre_unidad, licibot_unidad_compra.id, licibot_organismo.nombre_organismo
+        ORDER BY TotalGastado desc 
+        '''
+
+        tools.drop_view_if_exists(self._cr, 'licibot_variables_kmeans')
+        self.env.cr.execute(vista_variables)

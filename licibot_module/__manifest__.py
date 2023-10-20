@@ -11,7 +11,7 @@
     'version': '0.1.0',
     'website': '',
     'depends': ['crm', 'opens_licitacion_crm'],
-    'external_dependencies': {'python': ['pandas', 'requests']},
+    'external_dependencies': {'python': ['pandas', 'requests', 'numpy', 'scipy']},
     'license': 'OPL-1',
     'data': [
         'data/crones_licibot.xml',
