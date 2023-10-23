@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Licitaciones en Iniciativas y Oportunidades',
-    'version': '1.0',
+    'version': '1.0.0',
     'author': 'Open Solutions',
     'description': """
     """,

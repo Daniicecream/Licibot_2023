@@ -6,6 +6,10 @@ pip3 install -U scikit-learn
 Ejecutar chmod 777 /opt/addons_opens/licibot_module/Inputs para que la funcion de generar el pickle pueda insertar un archivo .sav generado
 '''
 
+'''
+TODO "Limpiar código basura y comentarios innecesarios."
+'''
+
 # Importando librerías Odoo (?)
 from odoo import models, fields, api, tools, _
 from odoo.exceptions import UserError
@@ -224,7 +228,7 @@ class Licitacion(models.Model):
                         FUNCIONES BASE DE DATOS
     =================================================================
     """
-    
+    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_organismo (self, codigo_organismo, nombre_organismo):
  
         if codigo_organismo is not None:
@@ -237,7 +241,7 @@ class Licitacion(models.Model):
 
         else:
             _logger.info(f"!!! Código organismo nulo. Omitiendo inserción de datos en tabla organismo...")
-
+    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_unidadCompra (self, codigo_unidad, rut_unidad, nombre_unidad, direccion_unidad, comuna_unidad, region_unidad, organismo_id): # Info SII cargada posteriormente con queries (momentaneo)
         
         if codigo_unidad is not None:
@@ -257,7 +261,7 @@ class Licitacion(models.Model):
                 })    
         else:
             _logger.info(f"!!! código unidad nulo. Omitiendo inserción de datos en tabla unidad...")
-
+    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_proveedor(self, rut_proveedor, nombre_proveedor):
         
         if rut_proveedor:
@@ -273,7 +277,7 @@ class Licitacion(models.Model):
                 })
         else:
             _logger.info("¡RUT de proveedor nulo. Omitiendo inserción de datos en la tabla proveedor...")
-
+    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_categoria(self, codigo_categoria, nom_categoria):
 
         if codigo_categoria:
@@ -288,7 +292,7 @@ class Licitacion(models.Model):
                 })
         else:
             _logger.info("¡Código de categoría nulo. Omitiendo inserción de datos en la tabla categoría...")
-    
+    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_productoServicio(self, id_producto_servicio, nom_prod_servicio, categoria_id):
 
         if id_producto_servicio:
@@ -304,7 +308,7 @@ class Licitacion(models.Model):
                 })
         else:
             _logger.info("¡ID de producto/servicio nulo. Omitiendo inserción de datos en la tabla producto/servicio...")
-
+    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_adjudicacion(self, num_admin_adjudicacion, fecha_admin_adjudicacion, num_oferentes, url_acta, tipo_acto_admn_id):
 
         self.env['licibot.adjudicacion'].sudo().create({
@@ -314,7 +318,7 @@ class Licitacion(models.Model):
             'url_acta': urlActa,
             'tipo_acto_admin_id': self.is_null_int(tipo_acto_admn_id),
         })
-
+    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_licitacion (
         self,
         codigo_externo, 
@@ -473,7 +477,7 @@ class Licitacion(models.Model):
                 })
         else:
             _logger.info("¡ID de producto/servicio nulo. Omitiendo inserción de datos en la tabla producto/servicio...")
-
+    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_item (
         self,
         correlativo, 
@@ -498,7 +502,7 @@ class Licitacion(models.Model):
             'producto_servicio_id' : self.is_null_int(producto_servicio_id), 
             'proveedor_id' : self.is_null_int(proveedor_select.id)
             })
-
+    # VERIFICAR FUNCIONAMIENTO...
     def obtener_licitaciones_hoy(self, ticket):
         fecha = self.get_fecha_actual()
         url = "http://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json"
@@ -520,7 +524,7 @@ class Licitacion(models.Model):
         except requests.exceptions.RequestException as e:
             _logger.error("Error en la solicitud HTTP: %s", e)
             return []
-
+    # VERIFICAR FUNCIONAMIENTO...
     def obtener_licitaciones_gas(self, codigos_externos, ticket, keywords):
         licitaciones_filtradas = []
 
@@ -548,7 +552,7 @@ class Licitacion(models.Model):
         licitaciones_model = self.env['your.licitaciones.model']
         licitaciones = licitaciones_model.search([('codigo_externo', 'in', licitaciones_filtradas)])
         self.licitaciones_ids = [(6, 0, licitaciones.ids)]
-
+    # VERIFICAR FUNCIONAMIENTO...
     def obtener_licitaciones_y_actualizar(self):
         ticket = self.env['ir.config_parameter'].sudo().get_param('your.ticket.parameter')
         codigos_externos = self.obtener_licitaciones_hoy(ticket)
@@ -608,7 +612,8 @@ class Licitacion(models.Model):
             except requests.exceptions.ReadTimeout as e:
                 _logger.info(f"Intento {retry+1} de {max_retries}. Error de tiempo de espera: {e}")
                 time.sleep(5)  # Esperar 5 segundos antes de reintentar
-
+    
+    # VERIFICAR UTILIDAD (?)
     def poblamiento_inicial (self):
         """
         ## Descripción
@@ -908,6 +913,7 @@ class Licitacion(models.Model):
             # Capturar la señal de "Ctrl + C" para detener la ejecución
             _logger.info("Se ha detenido la ejecución. Guardando los datos recopilados hasta ahora en la base de datos.")
 
+    # VERIFICAR UTILIDAD (?)
     def licitaciones_semana_anterior (self):
         ''' Esta función debe buscar todos los códigos externos o id's de licitaciones que se hayan agregado la semana pasada (en el contexto de que el calculo del ranking
         se haga de forma semanal, por ejemplo cada lunes.)
@@ -940,14 +946,17 @@ class Licitacion(models.Model):
         self.env.cr.execute("UPDATE licibot_unidad_compra SET ranking = NULL;")
 
         # Recuperar la lista de rut_unidad de la vista RANKING_V1
-        self.env.cr.execute('SELECT "ID Unidad de Compra" FROM RANKING_V1;')
+        ranking_length = int(self.env['ir.config_parameter'].sudo().get_param('licibot_module.ranking_length'))
+        _logger.info(ranking_length)
+        _logger.info(type(ranking_length))
+        self.env.cr.execute(f'SELECT "ID Unidad de Compra" FROM RANKING_V1 LIMIT {ranking_length};')
         id_unidad_list = list(line[0] for line in self.env.cr.fetchall())
 
         # Inicializar el contador de ranking
         pos_ranking = 1
 
         # Recorrer los primeros 20 elementos de la lista
-        for id_unidad in id_unidad_list[:20]: # Será parámetro 20
+        for id_unidad in id_unidad_list: 
 
             # Buscar y actualizar el campo "ranking" en el modelo UnidadCompra
             unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('id', '=', id_unidad)])
@@ -964,7 +973,7 @@ class Licitacion(models.Model):
 
     def generate_pickle (self):
         #Loading the dataset
-        data = pd.read_csv("opt/addons_opens/licibot_module/Inputs/paraEntrenar5xdd.csv", sep="," , encoding='iso-8859-1')
+        data = pd.read_csv("opt/addons_opens/licibot_module/Inputs/training.csv", sep="," , encoding='iso-8859-1')
         data = data.dropna()
         data["ultima_licitacion"] = pd.to_datetime(data["ultima_licitacion"])
         data["primera_licitacion"] = pd.to_datetime(data["primera_licitacion"])
@@ -996,13 +1005,19 @@ class Licitacion(models.Model):
         pickle_K = 'opt/addons_opens/licibot_module/Inputs/kmeans_pca_odoo.sav'
         pickle.dump(kmeans_pca, open(pickle_K, 'wb'))
 
-
     def ml_model(self):
         _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: ML Model K-Means <<<\n\n\n''')
 
         kmeans_model = pickle.load(open('opt/addons_opens/licibot_module/Inputs/kmeans_pca_odoo.sav', 'rb'))
 
         # Generar un PCA a partir de la información de la base de datos.
+        self.env.cr.execute("SELECT * FROM licibot_variables_kmeans;")
+        dataframe = self.env.cr.fetchall()
+        _logger.info('''\n\n\n
+        dataframe:
+        %s
+        \n\n\n
+        ''', dataframe)
 
         # Generar una predicción utilizando el modelo desde el archivo .sav.
 
@@ -1137,15 +1152,17 @@ class Licitacion(models.Model):
         _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: Envío al CRM <<<\n\n\n''')
 
         # Listar las id de unidades de compra rankeadas
-        self.env.cr.execute('SELECT id FROM licibot_unidad_compra ORDER BY ranking ASC;')
+        ranking_length = int(self.env['ir.config_parameter'].sudo().get_param('licibot_module.ranking_length'))
+        self.env.cr.execute(f'SELECT id FROM licibot_unidad_compra ORDER BY ranking ASC LIMIT {ranking_length};')
         id_unidad_list = list(line[0] for line in self.env.cr.fetchall())
 
         # Obtener token de la api crm
         token = self.ol_crm_get_token()
         _logger.info(token)
 
+
         # Recorrer la lista de ids de unidades de compra rankeadas
-        for id_unidad in id_unidad_list[:20]: # Será parámetro 20
+        for id_unidad in id_unidad_list: 
             
             query_ultima_oportunidad = f'''
             SELECT CAST(create_date AS DATE) FROM crm_lead WHERE bidding_number LIKE '%{id_unidad}%';

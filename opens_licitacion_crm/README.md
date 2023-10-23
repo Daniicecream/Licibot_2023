@@ -34,7 +34,7 @@
 }
 ``
 
-* En los headers de la petición, se debe incluir **Authorization: <token>**
+* En los headers de la petición, se debe incluir **Authorization:** *token*
 
 # Configuración
 

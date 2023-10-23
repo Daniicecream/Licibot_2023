@@ -4,7 +4,6 @@
             <field name="name">Actividad Licitación</field>
             <field name="res_model">crm.lead.bidding.activity</field>
             <field name="view_mode">tree,form</field>
-            <field name="domain">[]</field>
         </record>
 
         <record id="crm_lead_bidding_activity_tree_view" model="ir.ui.view">

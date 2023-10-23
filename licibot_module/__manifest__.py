@@ -15,6 +15,7 @@
     'license': 'OPL-1',
     'data': [
         'data/crones_licibot.xml',
+        'data/config_parameters.xml',
         'views/res_config_settings_views.xml'
     ],
     'active': True,

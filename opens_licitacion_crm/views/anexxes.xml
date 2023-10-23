@@ -4,7 +4,6 @@
             <field name="name">Anexos Licitación</field>
             <field name="res_model">crm.lead.anexxes</field>
             <field name="view_mode">tree,form</field>
-            <field name="domain">[]</field>
         </record>
 
         <record id="crm_lead_anexxes_tree_view" model="ir.ui.view">
