@@ -6,11 +6,9 @@
         <field name="model_id" ref="model_licibot_licitacion"/>
         <field name="interval_number">1</field>
         <field name="interval_type">weeks</field>
-        <field name="dayofweek">1</field>
-        <field name="hour">9</field>
         <field name="numbercall">-1</field>
-        <field name="state">code</field>
-        <field name="code">model.calculo_rankingv1()</field> 
+        <field name="code">model.calculo_rankingv1()</field>
+        <field name="active" eval="True" />
     </record>
 
     <record id="enviar_al_crm" model="ir.cron">
@@ -18,11 +16,9 @@
         <field name="model_id" ref="model_licibot_licitacion"/>
         <field name="interval_number">1</field>
         <field name="interval_type">weeks</field>
-        <field name="dayofweek">1</field>
-        <field name="hour">10</field>
         <field name="numbercall">-1</field>
-        <field name="state">code</field>
         <field name="code">model.ol_crm_send_info_provisoria()</field>
+        <field name="active" eval="True" />
     </record>
 
     <record id="ml_model_kmeans" model="ir.cron">
@@ -30,11 +26,9 @@
         <field name="model_id" ref="model_licibot_licitacion"/>
         <field name="interval_number">1</field>
         <field name="interval_type">weeks</field>
-        <field name="dayofweek">1</field>
-        <field name="hour">11</field>
         <field name="numbercall">-1</field>
-        <field name="state">code</field>
         <field name="code">model.ml_model()</field>
+        <field name="active" eval="True" />
     </record>
 
     <record id="ml_generate_pickle" model="ir.cron">
@@ -42,11 +36,9 @@
         <field name="model_id" ref="model_licibot_licitacion"/>
         <field name="interval_number">1</field>
         <field name="interval_type">weeks</field>
-        <field name="dayofweek">1</field>
-        <field name="hour">11</field>
         <field name="numbercall">-1</field>
-        <field name="state">code</field>
         <field name="code">model.generate_pickle()</field>
+        <field name="active" eval="False" />
     </record>
 
     <record id="easter_egg" model="ir.cron">
@@ -54,11 +46,9 @@
         <field name="model_id" ref="model_licibot_licitacion"/>
         <field name="interval_number">1</field>
         <field name="interval_type">weeks</field>
-        <field name="dayofweek">1</field>
-        <field name="hour">11</field>
         <field name="numbercall">-1</field>
-        <field name="state">code</field>
         <field name="code">model.easter_egg()</field>
+        <field name="active" eval="False" />
     </record>
 
 </odoo>

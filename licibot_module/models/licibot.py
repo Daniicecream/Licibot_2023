@@ -1,9 +1,10 @@
 '''
-pip3 install -U numpy
-pip3 install -U scipy
-pip3 install -U scikit-learn
-
-Ejecutar chmod 777 /opt/addons_opens/licibot_module/Inputs para que la funcion de generar el pickle pueda insertar un archivo .sav generado
+# Instalar librerías python
+pip3 install -U scipy pandas requests numpy scikit-learn
+# Instalar localización de es
+sudo apt-get install language-pack-es
+# Para que la funcion de generar el pickle pueda insertar un archivo .sav generado
+Ejecutar chmod 777 /opt/addons_opens/licibot_module/Inputs 
 '''
 
 '''
@@ -39,7 +40,7 @@ np.random.seed(42)
 _logger = logging.getLogger(__name__)
 
 # Configura moneda local CLP
-locale.setlocale(locale.LC_MONETARY, 'es_CL.UTF-8')
+locale.setlocale(locale.LC_MONETARY, 'es_CL.utf8')
 
 class Organismo(models.Model):
     _name = 'licibot.organismo'
@@ -241,6 +242,7 @@ class Licitacion(models.Model):
 
         else:
             _logger.info(f"!!! Código organismo nulo. Omitiendo inserción de datos en tabla organismo...")
+   
     # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_unidadCompra (self, codigo_unidad, rut_unidad, nombre_unidad, direccion_unidad, comuna_unidad, region_unidad, organismo_id): # Info SII cargada posteriormente con queries (momentaneo)
         
@@ -261,6 +263,7 @@ class Licitacion(models.Model):
                 })    
         else:
             _logger.info(f"!!! código unidad nulo. Omitiendo inserción de datos en tabla unidad...")
+   
     # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_proveedor(self, rut_proveedor, nombre_proveedor):
         
@@ -277,6 +280,7 @@ class Licitacion(models.Model):
                 })
         else:
             _logger.info("¡RUT de proveedor nulo. Omitiendo inserción de datos en la tabla proveedor...")
+  
     # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_categoria(self, codigo_categoria, nom_categoria):
 
@@ -292,6 +296,7 @@ class Licitacion(models.Model):
                 })
         else:
             _logger.info("¡Código de categoría nulo. Omitiendo inserción de datos en la tabla categoría...")
+   
     # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_productoServicio(self, id_producto_servicio, nom_prod_servicio, categoria_id):
 
@@ -308,6 +313,7 @@ class Licitacion(models.Model):
                 })
         else:
             _logger.info("¡ID de producto/servicio nulo. Omitiendo inserción de datos en la tabla producto/servicio...")
+   
     # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_adjudicacion(self, num_admin_adjudicacion, fecha_admin_adjudicacion, num_oferentes, url_acta, tipo_acto_admn_id):
 
@@ -318,6 +324,7 @@ class Licitacion(models.Model):
             'url_acta': urlActa,
             'tipo_acto_admin_id': self.is_null_int(tipo_acto_admn_id),
         })
+   
     # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_licitacion (
         self,
@@ -477,6 +484,7 @@ class Licitacion(models.Model):
                 })
         else:
             _logger.info("¡ID de producto/servicio nulo. Omitiendo inserción de datos en la tabla producto/servicio...")
+   
     # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
     def insertar_item (
         self,
@@ -502,6 +510,7 @@ class Licitacion(models.Model):
             'producto_servicio_id' : self.is_null_int(producto_servicio_id), 
             'proveedor_id' : self.is_null_int(proveedor_select.id)
             })
+  
     # VERIFICAR FUNCIONAMIENTO...
     def obtener_licitaciones_hoy(self, ticket):
         fecha = self.get_fecha_actual()
@@ -524,6 +533,7 @@ class Licitacion(models.Model):
         except requests.exceptions.RequestException as e:
             _logger.error("Error en la solicitud HTTP: %s", e)
             return []
+  
     # VERIFICAR FUNCIONAMIENTO...
     def obtener_licitaciones_gas(self, codigos_externos, ticket, keywords):
         licitaciones_filtradas = []
@@ -552,6 +562,7 @@ class Licitacion(models.Model):
         licitaciones_model = self.env['your.licitaciones.model']
         licitaciones = licitaciones_model.search([('codigo_externo', 'in', licitaciones_filtradas)])
         self.licitaciones_ids = [(6, 0, licitaciones.ids)]
+  
     # VERIFICAR FUNCIONAMIENTO...
     def obtener_licitaciones_y_actualizar(self):
         ticket = self.env['ir.config_parameter'].sudo().get_param('your.ticket.parameter')
@@ -638,8 +649,8 @@ class Licitacion(models.Model):
         # Restringir la columna de ids solo a la ID antes del primer ";"
         ids = ids.apply(lambda x: x.split(';')[0])
 
-        # Llamada del objeto res_config_settings que almacena el token de mp
-        res_config_settings = self.env['res.config.settings'].sudo()
+        # Traer token mp desde configuración
+        token_mp = self.env['ir.config_parameter'].sudo().get_param('licibot_module.token_mp')
 
         try:
             # Recorrer los elementos almacenados en la lista de ids de licitaciones
@@ -647,7 +658,7 @@ class Licitacion(models.Model):
 
                 # Realizar petición de datos para la ID de licitación
                 url = 'https://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json'
-                args = {'codigo': id, 'ticket': res_config_settings.get_param('token_api_mp')}
+                args = {'codigo': id, 'ticket': token_mp}
                 response = self.make_request_with_retries(url, args)
                 _logger.info(f"\nID: {id} Status Code: {response} \n")
                 _logger.info(f"\nProcesando ({count}/{len(ids)})")
@@ -821,7 +832,7 @@ class Licitacion(models.Model):
                             data['Adjudicacion_Fecha'],
                             data['Adjudicacion_NumeroOferentes'],
                             data['Adjudicacion_UrlActa'],
-                            data['Adjudicacion_Tipo'] # tipo_acto_admn_id
+                            data['Adjudicacion_Tipo'] # tipo_acto_adm_id
                         )
 
                         self.insertar_licitacion (
@@ -971,6 +982,7 @@ class Licitacion(models.Model):
         fecha_actual = fields.Date.today()
         return fecha_actual
 
+    # Funcion innecesaria actualmente (?)
     def generate_pickle (self):
         #Loading the dataset
         data = pd.read_csv("opt/addons_opens/licibot_module/Inputs/training.csv", sep="," , encoding='iso-8859-1')
@@ -1008,18 +1020,127 @@ class Licitacion(models.Model):
     def ml_model(self):
         _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: ML Model K-Means <<<\n\n\n''')
 
-        kmeans_model = pickle.load(open('opt/addons_opens/licibot_module/Inputs/kmeans_pca_odoo.sav', 'rb'))
+        # Cargar el archivo que contiene el modelo de ML
+        kmeans_model = pickle.load(open('opt/addons_opens/licibot_module/Inputs/kmeans_pca2.sav', 'rb'))
 
         # Generar un PCA a partir de la información de la base de datos.
-        self.env.cr.execute("SELECT * FROM licibot_variables_kmeans;")
-        dataframe = self.env.cr.fetchall()
+        self.env.cr.execute("""
+            SELECT 
+                idunidad,
+                licitacionestotales,
+                totalgastado,
+                gasto2022,
+                diferenciaanterior2023,
+                proveedores2022,
+                proveedores2023,
+                competenciaotros,
+                valorpromediocompra,
+                cantidadtrabajadores,
+                clientenuevo
+            FROM licibot_variables_kmeans;
+            """)
+
+        query_result = self.env.cr.fetchall()
+
+        # Convierte los resultados en un DataFrame
+        df = pd.DataFrame(query_result, columns=["idunidad", "licitacionestotales", "totalgastado", "gasto2022", "diferenciaanterior2023", "proveedores2022", "proveedores2023", "competenciaotros", "valorpromediocompra", "cantidadtrabajadores", "clientenuevo"])
+
         _logger.info('''\n\n\n
-        dataframe:
+        Imprime DF head 10:
         %s
         \n\n\n
-        ''', dataframe)
+        ''', df.head(10))
 
+        # Replicando el Componente Principal de Análisis (PCA) 
+        scaler = StandardScaler()
+        scaler.fit(df)
+        scaled_df = pd.DataFrame(scaler.transform(df),columns= df.columns)
+        _logger.info("All features are now scaled ...")
+
+        pca = PCA(n_components=3)
+        pca.fit(scaled_df)
+        PCA_df = pd.DataFrame(pca.transform(scaled_df), columns=(["col1","col2", "col3"]))
+        _logger.info('''\n\n\n
+        Describing PCA:
+        %s
+        \n\n\n
+        ''', PCA_df.describe().T)
+
+        kmeans_pca = KMeans(n_clusters = 4, init = 'k-means++', random_state = 42)
+        kmeans_pca.fit(PCA_df)
+        _logger.info('PCA kmeans calculated? ... OK')
+
+        df_segm_pca_kmeans = pd.concat([df.reset_index(drop = True), pd.DataFrame(PCA_df)], axis = 1)
+        df_segm_pca_kmeans.columns.values[-3: ] = ['col1', 'col2', 'col3']
+
+        df_segm_pca_kmeans['Segment K-means PCA'] = kmeans_pca.labels_
+        _logger.info('''\n\n\n
+        Showing dataframe segment pca kmeans ...:
+        %s
+        \n\n\n
+        ''', df_segm_pca_kmeans.iloc[:, :5])
+
+        _logger.info('''\n\n\n
+        Showing dataframe segment pca kmeans INFO ...:
+        %s
+        \n\n\n
+        ''', df_segm_pca_kmeans.info(verbose=True))
+
+        df_last_3_columns = df_segm_pca_kmeans.iloc[:, -4:]
+
+        _logger.info('''\n\n\n
+        Showing dataframe last 4 columns ...:
+        %s
+        \n\n\n
+        ''', df_last_3_columns.head(25))
+
+        # Analisis de clusters
+        # _logger.info('''
+        # \n\n\n
+        # > > > Clusters analisis < < <
+        # \n\n\n
+        # ''')
+
+        # selected_columns = df_segm_pca_kmeans[['nombre_unidad', 'competencia_otros', 'Segment K-means PCA']]
+        # _logger.info('''\n\n\n
+        # Showing Selected Columns ...:
+        # %s
+        # \n\n\n
+        # ''', selected_columns.head(25))
+
+        # analisiscluster = df_segm_pca_kmeans[(df_segm_pca_kmeans["Segment K-means PCA"] == 0)]
+        # _logger.info('''\n\n\n
+        # Showing Clusters 0 Analisis ...:
+        # %s
+        # \n\n\n
+        # ''', analisiscluster.head(50))
+
+        # analisiscluster = df_segm_pca_kmeans[(df_segm_pca_kmeans["Segment K-means PCA"] == 1)]
+        # _logger.info('''\n\n\n
+        # Showing Clusters 1 Analisis ...:
+        # %s
+        # \n\n\n
+        # ''', analisiscluster.head(50))
+
+        # analisiscluster = df_segm_pca_kmeans[(df_segm_pca_kmeans["Segment K-means PCA"] == 2)]
+        # _logger.info('''\n\n\n
+        # Showing Clusters 2 Analisis ...:
+        # %s
+        # \n\n\n
+        # ''', analisiscluster.head(50))
+
+        # analisiscluster = df_segm_pca_kmeans[(df_segm_pca_kmeans["Segment K-means PCA"] == 3)]
+        # _logger.info('''\n\n\n
+        # Showing Clusters 3 Analisis ...:
+        # %s
+        # \n\n\n
+        # ''', analisiscluster.head(50))
+
+        # pickle.dump(kmeans_pca, open('opt/addons_opens/licibot_module/Inputs/kmeans_pca_odoo.sav', 'wb'))
+        
         # Generar una predicción utilizando el modelo desde el archivo .sav.
+        # pred = kmeans_pca.predict(PCA_df)
+        # df['Segment K-means PCA'] = pred
 
         # Sobreescribir la información de la predicción en la base de datos.
 
@@ -1103,12 +1224,15 @@ class Licitacion(models.Model):
     def ol_crm_get_token (self):
         '''Función que retorna el token de acceso necesario para utilizar la api del crm'''
 
-        url = 'http://173.255.243.74:8069/token'
+        server_ip = self.env['ir.config_parameter'].sudo().get_param('licibot_module.ip')
+        url = f'http://{server_ip}:8069/token'
         response = requests.get(url)
-        _logger.info(response.status_code)
+        _logger.info(f'ol_crm_get_token: {response.status_code}')
 
         if response.status_code == 200:
-            token = response.text 
+            data = response.json() 
+            token = data["token"]
+            _logger.info(f'ol_crm_get_token: {token}')
             return token
         else:
             _logger.info(f"\n Error al obtener el token. Código de estado: {response.status_code}")
@@ -1149,6 +1273,7 @@ class Licitacion(models.Model):
         '''De momento dado que la api de mercadopublico sigue caída lo que se quiere es que teniendo en consideración el ranking, se busque y se envie al CRM
         la información de la última licitación registrada en la base de datos para cada una de esas unidades de compra dentro del ranking (20 en total)'''
 
+        server_ip = self.env['ir.config_parameter'].sudo().get_param('licibot_module.ip')
         _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: Envío al CRM <<<\n\n\n''')
 
         # Listar las id de unidades de compra rankeadas
@@ -1158,8 +1283,6 @@ class Licitacion(models.Model):
 
         # Obtener token de la api crm
         token = self.ol_crm_get_token()
-        _logger.info(token)
-
 
         # Recorrer la lista de ids de unidades de compra rankeadas
         for id_unidad in id_unidad_list: 
@@ -1171,14 +1294,14 @@ class Licitacion(models.Model):
             fecha_ultima_oportunidad = self.env.cr.fetchone()
 
             fecha_actual = datetime.date.today()
-            _logger.info(f"# # # # Tipo fecha_actual: {type(fecha_actual)} Valor {fecha_actual} # # # # ")
-            diff_dias_permitidos = 180              # Será parámetro
+            # _logger.info(f"# # # # Tipo fecha_actual: {type(fecha_actual)} Valor {fecha_actual} # # # # ")
+            diff_dias_permitidos = int(self.env['ir.config_parameter'].sudo().get_param('licibot_module.days_gone'))
 
             # Cuando exista la fecha de ultima oportunidad la calcula, caso contrario asigna un valor a la diff_real para entender que no existen registros de esa unidad de compra
             if fecha_ultima_oportunidad:
-                _logger.info(f"# # # # Tipo fecha ultima oportunidad: {type(fecha_ultima_oportunidad)} Valor {fecha_ultima_oportunidad} # # # # ")
+                # _logger.info(f"# # # # Tipo fecha ultima oportunidad: {type(fecha_ultima_oportunidad)} Valor {fecha_ultima_oportunidad} # # # # ")
                 fecha_ultima_oportunidad = datetime.date(fecha_ultima_oportunidad[0].year, fecha_ultima_oportunidad[0].month, fecha_ultima_oportunidad[0].day)
-                _logger.info(f"# # # # Tipo fecha ultima oportunidad (DESPUES): {type(fecha_ultima_oportunidad)} Valor {fecha_ultima_oportunidad} # # # # ")
+                # _logger.info(f"# # # # Tipo fecha ultima oportunidad (DESPUES): {type(fecha_ultima_oportunidad)} Valor {fecha_ultima_oportunidad} # # # # ")
                 diff_real = int((fecha_actual - fecha_ultima_oportunidad).total_seconds() / 60 / 60 / 24)
             else:
                 diff_real = 9999999
@@ -1246,11 +1369,11 @@ class Licitacion(models.Model):
                     (fecha_actual + datetime.timedelta(days = margen_días)).strftime('%Y-%m-%d'))                                                # Fecha Cierre: Tomar fecha de hoy + X días (parámetro).
                 
                 # Envio de información al CRM acorde a las instrucciones de Fco.
-                url = 'http://173.255.243.74:8069/licitaciones'
+                url = f'http://{server_ip}:8069/licitaciones'
                 headers = {'Authorization': token}
                 response = requests.post(url, headers=headers, json=json)
                 
-                _logger.info(f"Respuesta de API CRM: Código {response.status_code}")
+                # _logger.info(f"Respuesta de API CRM: Código {response.status_code}")
 
         _logger.info('''\n\n\n>>> Finalizando CRON Licibot: Envío al CRM <<<\n\n\n''')
 
@@ -1273,7 +1396,6 @@ class ItemLicitacion (models.Model):
     producto_servicio_id = fields.Many2one('licibot.producto.servicio', string = 'ProductoServicio_id')
     proveedor_id = fields.Many2one('licibot.proveedor', string = 'Proveedor_id')
 
-    @api.model_cr
     def init(self):
         '''Método que se ejecutara en la inicialización de bd, al instalar o actualizar este u otro
         modulo que contenga el modelo por herencia, es importante el decorador @api.model_cr'''

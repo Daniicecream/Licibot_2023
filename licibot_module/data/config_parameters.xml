@@ -10,5 +10,15 @@
             <field name="key">licibot_module.days_gone</field>
             <field name="value">180</field>
         </record>
+
+        <record id="licibot_ip" model="ir.config_parameter">
+            <field name="key">licibot_module.ip</field>
+            <field name="value">173.255.201.50</field>
+        </record>
+
+        <record id="licibot_token_mp" model="ir.config_parameter">
+            <field name="key">licibot_module.token_mp</field>
+            <field name="value">DFB4802F-ECCB-4A6D-B50C-E6F81B435F41</field>
+        </record>
     </data>
 </odoo>
