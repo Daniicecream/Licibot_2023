@@ -22,6 +22,8 @@ import time
 import datetime
 import pandas as pd
 import locale
+import re
+from dateutil.parser import parse
 
 # Importando librerías externas ML
 import pickle
@@ -45,13 +47,11 @@ locale.setlocale(locale.LC_MONETARY, 'es_CL.utf8')
 class Organismo(models.Model):
     _name = 'licibot.organismo'
 
-    # codigo_organismo = fields.Integer(string='Código organismo')
     nombre_organismo = fields.Char(string='Nombre organismo') 
 
 class UnidadCompra(models.Model):
     _name = 'licibot.unidad.compra'
 
-    # codigo_unidad = fields.Integer(string='Código unidad')
     rut_unidad = fields.Char(string='Rut unidad') 
     nombre_unidad = fields.Char(string='Nombre unidad')
     direccion_unidad = fields.Char(string='Dirección unidad')
@@ -80,7 +80,6 @@ class UnidadCompra(models.Model):
 class TipoCompetidor (models.Model):
     _name = 'licibot.tipo.competidor'
 
-    # id_tipo_comp = fields.Integer(string = 'ID Tipo Competidor')
     nom_tipo_comp = fields.Char(string = 'Nombre Tipo Competidor')
 
 class Proveedor (models.Model):
@@ -93,7 +92,6 @@ class Proveedor (models.Model):
 class Categoria (models.Model):
     _name = 'licibot.categoria'
 
-    # codigo_categoria = fields.Integer(string = 'Código Categoria')
     nom_categoria = fields.Char(string = 'Nombre Categoria')
 
 class TipoLicitacion (models.Model):
@@ -111,31 +109,26 @@ class UnidadMonetaria (models.Model):
 class MontoEstimado (models.Model):
     _name = 'licibot.monto.estimado'
 
-    # id_monto_estimado = fields.Integer(string = 'ID Monto Estimado')
     nom_monto_estimado = fields.Char(string = 'Nombre Monto Estimado')
 
 class ModalidadPago (models.Model):
     _name = 'licibot.modalidad.pago'
 
-    # id_modalidad_pago = fields.Integer(string = 'ID Modalidad Pago')
     nom_modalidad_pago = fields.Char(string = 'Nombre Modalidad Pago')
 
 class UnidadTiempoContrato (models.Model):
     _name = 'licibot.unidad.tiempo.contrato'
 
-    # id_uni_tiempo_con = fields.Integer(string = 'ID Unidad Tiempo Contrato')
     nom_uni_tiempo_con = fields.Char(string = 'Nombre Unidad Tiempo Contrato')
 
 class UnidadTiempoEvaluacion (models.Model):
     _name = 'licibot.unidad.tiempo.evaluacion'
 
-    # id_uni_tiempo_ev = fields.Integer(string = 'ID Unidad Tiempo Evaluacion')
     nom_uni_tiempo_ev = fields.Char(string = 'Nombre Unidad Tiempo Evaluacion')
 
 class TipoActoAdministrativo (models.Model):
     _name = 'licibot.tipo.acto.administrativo'
 
-    # id_tipo_acto_admin = fields.Integer(string = 'ID Tipo Acto Administrativo')
     nom_acto_admin = fields.Char(string = 'Nombre Tipo Acto Administrativo')
 
 class Adjudicacion (models.Model):
@@ -226,106 +219,132 @@ class Licitacion(models.Model):
 
     """
     =================================================================
-                        FUNCIONES BASE DE DATOS
+                        FUNCIONES DE INSERCIÓN
     =================================================================
     """
-    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
+    # Falta testing.
     def insertar_organismo (self, codigo_organismo, nombre_organismo):
  
-        if codigo_organismo is not None:
-            organismo_exists = self.env['licibot.organismo'].sudo().search([('codigo_organismo', '=', codigo_organismo)])
+        if codigo_organismo:
+
+            cod_org_clean = int(codigo_organismo.strip())
+
+            organismo_exists = self.env['licibot.organismo'].sudo().search([('id', '=', cod_org_clean)])
             
             if organismo_exists:
-                _logger.info(f"El organismo {codigo_organismo}:{nombre_organismo}, ya existe en la base de datos")
+                _logger.info(f"El organismo {cod_org_clean}: {nombre_organismo}, ya existe en la base de datos")
             else:
-                self.env['licibot.organismo'].sudo().create({'id': codigo_organismo, 'nombre_organismo': nombre_organismo})
+                self.env['licibot.organismo'].sudo().create({'id': cod_org_clean, 'nombre_organismo': nombre_organismo})
 
         else:
             _logger.info(f"!!! Código organismo nulo. Omitiendo inserción de datos en tabla organismo...")
    
-    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
+    # Falta testing
     def insertar_unidadCompra (self, codigo_unidad, rut_unidad, nombre_unidad, direccion_unidad, comuna_unidad, region_unidad, organismo_id): # Info SII cargada posteriormente con queries (momentaneo)
         
-        if codigo_unidad is not None:
-            unidadCompra_exists = self.env['licibot.unidad.compra'].sudo().search([('id', '=', codigo_unidad)])
+        if codigo_unidad:
+
+            uc_clean = int(codigo_unidad.strip())
+            cod_org_clean = int(organismo_id.strip())
+
+            unidadCompra_exists = self.env['licibot.unidad.compra'].sudo().search([('id', '=', uc_clean)])
 
             if unidadCompra_exists:
-                _logger.info(f"La unidad de compra {codigo_unidad}:{nombre_unidad}, ya existe en la base de datos.")
+                _logger.info(f"La unidad de compra {uc_clean}: {nombre_unidad}, ya existe en la base de datos.")
             else:
                 self.env['licibot.unidad.compra'].sudo().create({
-                    'id' : codigo_unidad, 
-                    'rut_unidad' : rut_unidad, 
-                    'nombre_unidad' : nombre_unidad, 
-                    'direccion_unidad' : direccion_unidad, 
-                    'comuna_unidad' : comuna_unidad, 
-                    'region_unidad' : region_unidad, 
-                    'organismo_id' : self.is_null_int(organismo_id)
+                    'id' : uc_clean, 
+                    'rut_unidad' : rut_unidad.strip(), 
+                    'nombre_unidad' : nombre_unidad.strip(), 
+                    'direccion_unidad' : direccion_unidad.strip(), 
+                    'comuna_unidad' : comuna_unidad.strip(), 
+                    'region_unidad' : region_unidad.strip(), 
+                    'organismo_id' : self.is_null_int(cod_org_clean)
                 })    
         else:
             _logger.info(f"!!! código unidad nulo. Omitiendo inserción de datos en tabla unidad...")
    
-    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
+    # Falta testing
     def insertar_proveedor(self, rut_proveedor, nombre_proveedor):
         
         if rut_proveedor:
-            proveedor_existente = self.env['licibot.proveedor'].sudo().search([('rut_proveedor', '=', rut_proveedor)])
 
-            if proveedor_existente:
-                _logger.info(f"El proveedor {rut_proveedor} {nombre_proveedor} ya existe en la base de datos.")
+            rut_prov_clean = rut_proveedor.strip()
+            proveedor_exists = self.env['licibot.proveedor'].sudo().search([('rut_proveedor', '=', rut_prov_clean)])
+
+            if proveedor_exists:
+                _logger.info(f"El proveedor {rut_prov_clean} {nombre_proveedor} ya existe en la base de datos.")
             else:
                 self.env['licibot.proveedor'].sudo().create({
-                    'rut_proveedor': rut_proveedor,
-                    'nombre_proveedor': nombre_proveedor,
+                    'rut_proveedor': rut_prov_clean,
+                    'nombre_proveedor': nombre_proveedor.strip(),
                     'tipo_competidor_id': self.identificar_tipo_competidor(nombre_proveedor),
                 })
         else:
             _logger.info("¡RUT de proveedor nulo. Omitiendo inserción de datos en la tabla proveedor...")
   
-    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
+    # Falta testing
     def insertar_categoria(self, codigo_categoria, nom_categoria):
 
         if codigo_categoria:
-            categoria_existente = self.env['licibot.categoria'].sudo().search([('id', '=', codigo_categoria)])
+            
+            cod_cat_clean = int(codigo_categoria.strip())
+            categoria_exists = self.env['licibot.categoria'].sudo().search([('id', '=', cod_cat_clean)])
 
-            if categoria_existente:
-                _logger.info(f"La categoría {codigo_categoria}:{nom_categoria} ya existe en la base de datos.")
+            if categoria_exists:
+                _logger.info(f"La categoría {cod_cat_clean}: {nom_categoria} ya existe en la base de datos.")
             else:
                 self.env['licibot.categoria'].sudo().create({
-                    'id': codigo_categoria,
-                    'nom_categoria': nom_categoria,
+                    'id': cod_cat_clean,
+                    'nom_categoria': nom_categoria.strip(),
                 })
         else:
             _logger.info("¡Código de categoría nulo. Omitiendo inserción de datos en la tabla categoría...")
    
-    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
-    def insertar_productoServicio(self, id_producto_servicio, nom_prod_servicio, categoria_id):
+    # Falta testing
+    def insertar_productoServicio(self, codigo_producto, nom_prod_servicio, categoria_id):
 
-        if id_producto_servicio:
-            producto_servicio_existente = self.env['licibot.producto.servicio'].sudo().search([('id', '=', id_producto_servicio)])
+        if codigo_producto:
+            cod_cat_clean = int(categoria_id.strip())
+            producto_servicio_exists = self.env['licibot.producto.servicio'].sudo().search([('id', '=', codigo_producto)])
 
-            if producto_servicio_existente:
-                _logger.info(f"El producto/servicio {id_producto_servicio} {nom_prod_servicio} ya existe en la base de datos.")
+            if producto_servicio_exists:
+                _logger.info(f"El producto/servicio {codigo_producto} {nom_prod_servicio} ya existe en la base de datos.")
             else:
                 self.env['licibot.producto.servicio'].sudo().create({
-                    'id': id_producto_servicio,
-                    'nom_prod_servicio': nom_prod_servicio,
-                    'categoria_id': self.is_null_int(categoria_id),
+                    'id': codigo_producto,
+                    'nom_prod_servicio': nom_prod_servicio.strip(),
+                    'categoria_id': self.is_null_int(cod_cat_clean),
                 })
         else:
             _logger.info("¡ID de producto/servicio nulo. Omitiendo inserción de datos en la tabla producto/servicio...")
    
-    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
+    # Falta testing
     def insertar_adjudicacion(self, num_admin_adjudicacion, fecha_admin_adjudicacion, num_oferentes, url_acta, tipo_acto_admn_id):
+        
+        if num_admin_adjudicacion:
 
-        self.env['licibot.adjudicacion'].sudo().create({
-            'num_admin_adjudicacion': numeroAdmAdjudicacion,
-            'fecha_admin_adjudicacion': fechaAdmAdjudicacion,
-            'num_oferentes': numeroOferentes,
-            'url_acta': urlActa,
-            'tipo_acto_admin_id': self.is_null_int(tipo_acto_admn_id),
-        })
+            num_admin_adj_clean = num_admin_adjudicacion.strip()
+            num_adj_exists = self.env['licibot.adjudicacion'].sudo().search([('num_admin_adjudicacion', '=', num_admin_adj_clean)])
+            
+            if num_adj_exists:
+                _logger.info(f"La adjudicación {num_admin_adj_clean} ya existe en la base de datos.")
+            else:
+                self.env['licibot.adjudicacion'].sudo().create({
+                    'num_admin_adjudicacion': num_admin_adj_clean,
+                    'fecha_admin_adjudicacion': self.convertir_fecha(fecha_admin_adjudicacion),
+                    'num_oferentes': self.is_null_int(num_oferentes),
+                    'url_acta': self.is_null_str(url_acta),
+                    'tipo_acto_admin_id': self.is_null_int(tipo_acto_admn_id),
+                })
+        else:
+            _logger.info("¡Adjudicacion Nula. Omitiendo inserción de datos en la tabla de Adjudicaciones...")
    
     # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
+    ### AL EJECUTAR EL CRON SE VE EN CONSOLA QUE LOS CAMPOS SE ASIGNAN BIEN. EL 'id' QUE TIENE EL NEXTVAL PERO NO LO RECONOCE.
+    ### CADA VEZ QUE SE EJECUTA EL CRON, EL id AUMENTA EN 1 (HUBIERA QUE EJECUTARLO 9340 VECES PARA ALCANZAR EL ULTIMO ID DE LICITACION)
+    ### ¿PROBABLEMENTE ALGO MAL EN LA FUNCIÓN DE EXTRACCIÓN? (LOS CAMPOS SE VEN BIEN DISTRIBUIDOS EN LA CONSOLA)
+    ### FOTO (CRON EJECUTADO 13 VECES): https://prnt.sc/mrloKAlhPEx-    
     def insertar_licitacion (
         self,
         codigo_externo, 
@@ -402,9 +421,14 @@ class Licitacion(models.Model):
         unidad_compra_id 
         ):
 
+        tipo_licitacion_select = self.env['licibot.tipo.licitacion'].sudo().search([('id_tipo_licitacion','=', tipo_licitacion_id)])
+        tipo_id_monetaria = self.env['licibot.unidad.monetaria'].sudo().search([('id_unidad_monetaria','=', unidad_monetaria_id)])
+        num_adj = self.env['licibot.adjudicacion'].sudo().search([('num_admin_adjudicacion','=', adjudicacion_id)])
+        select_uni_comp = self.env['licibot.unidad.compra'].sudo().search([('id', '=', unidad_compra_id)])
+        # select_monto_est = self.env['licibot.monto.unitario'].sudo().search([('')])
+
         if codigo_externo:
             licitacion_existe = self.env['licibot.licitacion'].sudo().search([('codigo_externo', '=', codigo_externo)])
-
             if licitacion_existe:
                 _logger.info(f"La licitacion {codigo_externo}:{nombre}, ya existe en la base de datos.")
             else:
@@ -427,22 +451,22 @@ class Licitacion(models.Model):
                     'contrato' : contrato, 
                     'obras' : obras, 
                     'cant_reclamos' : cant_reclamos, 
-                    'fecha_creacion' : fecha_creacion, 
-                    'fecha_cierre_2' : fecha_cierre_2, 
-                    'fecha_inicio' : fecha_inicio, 
-                    'fecha_final' : fecha_final, 
-                    'fecha_pub_respuestas' : fecha_pub_respuestas, 
-                    'fecha_act_aper_tec' : fecha_act_aper_tec, 
-                    'fecha_act_aper_eco' : fecha_act_aper_eco, 
-                    'fecha_publicacion' : fecha_publicacion, 
-                    'fecha_adjudicacion' : fecha_adjudicacion, 
-                    'fecha_est_adjudicacion' : fecha_est_adjudicacion, 
-                    'fecha_soporte_fisico' : fecha_soporte_fisico, 
-                    'fecha_tiempo_eval' : fecha_tiempo_eval, 
-                    'fecha_estimada_firma' : fecha_estimada_firma, 
-                    'fecha_usuario' : fecha_usuario, 
-                    'fecha_visita_terreno' : fecha_visita_terreno, 
-                    'fecha_entrega_antecedentes' : fecha_entrega_antecedentes, 
+                    'fecha_creacion' : self.convertir_fecha(fecha_creacion), 
+                    'fecha_cierre_2' : self.convertir_fecha(fecha_cierre_2), 
+                    'fecha_inicio' : self.convertir_fecha(fecha_inicio), 
+                    'fecha_final' : self.convertir_fecha(fecha_final), 
+                    'fecha_pub_respuestas' : self.convertir_fecha(fecha_pub_respuestas), 
+                    'fecha_act_aper_tec' : self.convertir_fecha(fecha_act_aper_tec), 
+                    'fecha_act_aper_eco' : self.convertir_fecha(fecha_act_aper_eco), 
+                    'fecha_publicacion' : self.convertir_fecha(fecha_publicacion), 
+                    'fecha_adjudicacion' : self.convertir_fecha(fecha_adjudicacion), 
+                    'fecha_est_adjudicacion' : self.convertir_fecha(fecha_est_adjudicacion), 
+                    'fecha_soporte_fisico' : self.convertir_fecha(fecha_soporte_fisico), 
+                    'fecha_tiempo_eval' : self.convertir_fecha(fecha_tiempo_eval), 
+                    'fecha_estimada_firma' : self.convertir_fecha(fecha_estimada_firma), 
+                    'fecha_usuario' : self.convertir_fecha(fecha_usuario), 
+                    'fecha_visita_terreno' : self.convertir_fecha(fecha_visita_terreno), 
+                    'fecha_entrega_antecedentes' : self.convertir_fecha(fecha_entrega_antecedentes), 
                     'uni_tiempo_eval' : uni_tiempo_eval, 
                     'direccion_visita' : direccion_visita, 
                     'direccion_entrega' : direccion_entrega, 
@@ -473,19 +497,20 @@ class Licitacion(models.Model):
                     'rut_contacto' : self.is_null_str(rut_contacto), 
                     'nom_contacto' : nom_contacto, 
                     'cargo_contacto' : cargo_contacto, 
-                    'adjudicacion_id' : self.is_null_str(adjudicacion_id), 
-                    'tipo_licitacion_id' : self.is_null_str(tipo_licitacion_id), 
-                    'uni_tiempo_ev_id' : self.is_null_int(uni_tiempo_ev_id), 
-                    'unidad_monetaria_id' : self.is_null_int(unidad_monetaria_id), 
+                    'adjudicacion_id' : self.is_null_int(num_adj.id),  
+                    'tipo_licitacion_id' : tipo_licitacion_select.id,           
+                    'uni_tiempo_ev_id' : self.is_null_int(uni_tiempo_ev_id),        
+                    'unidad_monetaria_id' : tipo_id_monetaria.id, 
                     'monto_estimado_id' : self.is_null_int(monto_estimado_id), 
                     'uni_tiempo_con_id' : self.is_null_int(uni_tiempo_con_id), 
                     'modalidad_pago_id' : self.is_null_int(modalidad_pago_id), 
-                    'unidad_compra_id' : self.is_null_str(unidad_compra_id) 
+                    'unidad_compra_id' : self.is_null_int(select_uni_comp.id) 
                 })
+
         else:
             _logger.info("¡ID de producto/servicio nulo. Omitiendo inserción de datos en la tabla producto/servicio...")
-   
-    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
+
+    # Falta testing
     def insertar_item (
         self,
         correlativo, 
@@ -497,8 +522,8 @@ class Licitacion(models.Model):
         producto_servicio_id, 
         proveedor_id):
 
-        proveedor_select = self.env['licibot.proveedor'].sudo().search([('rut_proveedor','=', proveedor_id)])
-        licitacion_select = self.env['licibot.licitacion'].sudo().search([('codigo_Externo','=', licitacion_id)])
+        licitacion_select = self.env['licibot.licitacion'].sudo().search([('codigo_externo','=', licitacion_id.strip())])
+        proveedor_select = self.env['licibot.proveedor'].sudo().search([('rut_proveedor','=', proveedor_id.strip())])
 
         self.env['licibot.item.licitacion'].sudo().create({
             'correlativo' : correlativo, 
@@ -506,164 +531,83 @@ class Licitacion(models.Model):
             'cant_unitaria_prod' : cant_unitaria_prod, 
             'monto_unitario' : monto_unitario, 
             'desc_producto' : desc_producto, 
-            'licitacion_id' : self.is_null_str(licitacion_select.id), 
-            'producto_servicio_id' : self.is_null_int(producto_servicio_id), 
+            'licitacion_id' : self.is_null_int(licitacion_select.id), 
+            'producto_servicio_id' : self.is_null_int(producto_select), 
             'proveedor_id' : self.is_null_int(proveedor_select.id)
             })
-  
-    # VERIFICAR FUNCIONAMIENTO...
-    def obtener_licitaciones_hoy(self, ticket):
-        fecha = self.get_fecha_actual()
-        url = "http://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json"
-        params = {"fecha": fecha, "ticket": ticket}
+
+    """
+    =================================================================
+                        FUNCIONES DE EXTRACCIÓN
+    =================================================================
+    """
+
+    # Funciona, entrega lista de licitaciones adjudicadas
+    def listar_licitaciones_diarias(self):
+        """
+        Esta función realiza una petición a la api de mercadopublico y retorna una lista con todos los codigos externos
+        de las licitaciones encontradas para la fecha del día anterior (se consulta el día anterior ya que de esta forma
+        se asegura que se dispone de la lista de licitaciones completa de un día).
+        """
+        token_mp = self.env['ir.config_parameter'].sudo().get_param('licibot_module.token_mp')
+        url = "https://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json"
+        params = {'estado' : 'adjudicada', 'fecha': self.fecha_dia_anterior(), 'ticket': token_mp}
 
         try:
             response = requests.get(url, params=params)
-            response.raise_for_status()  # Genera una excepción si la solicitud no fue exitosa
-
             data = response.json()
 
-            if "Listado" in data:
-                licitaciones = data["Listado"]
-                codigo_externo_list = [licitacion["CodigoExterno"] for licitacion in licitaciones]
-                return codigo_externo_list
+            if 'Listado' in data:
+                codigos_externos = [item['CodigoExterno'] for item in data['Listado']]
+                _logger.info(f"Para el día {self.fecha_dia_anterior()} hay {len(codigos_externos)} licitaciones adjudicadas.)")
+                return codigos_externos
             else:
-                _logger.warning("No se encontraron licitaciones.")
-                return []
+                return {'error': f'No se encontraron licitaciones adjudicadas para la fecha {self.fecha_dia_anterior()}'}
+
         except requests.exceptions.RequestException as e:
-            _logger.error("Error en la solicitud HTTP: %s", e)
-            return []
-  
-    # VERIFICAR FUNCIONAMIENTO...
-    def obtener_licitaciones_gas(self, codigos_externos, ticket, keywords):
-        licitaciones_filtradas = []
+            return {'error': f"Error en la solicitud a la API: {e}"}
 
-        for codigo in codigos_externos:
-            url = "http://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json"
-            params = {"codigo": codigo, "ticket": ticket}
-
-            try:
-                response = requests.get(url, params=params)
-                response.raise_for_status()  # Genera una excepción si la solicitud no fue exitosa
-
-                data = response.json()
-
-                if "Listado" in data:
-                    licitacion = data["Listado"][0]  # El código externo es único.
-                    if "Nombre" in licitacion and "Descripcion" in licitacion and "Categoria" in licitacion:
-                        texto_licitacion = f"{licitacion['Nombre'].lower()} {licitacion['Descripcion'].lower()} {licitacion['Categoria'].lower()}"
-                        if any(keyword.strip().lower() in texto_licitacion for keyword in keywords.split(',')):
-                            licitaciones_filtradas.append(codigo)
-                else:
-                    _logger.warning(f"No se encontró licitación para el CodigoExterno {codigo}.")
-            except requests.exceptions.RequestException as e:
-                _logger.error("Error en la solicitud HTTP para el CodigoExterno %s: %s", codigo, e)
-
-        licitaciones_model = self.env['your.licitaciones.model']
-        licitaciones = licitaciones_model.search([('codigo_externo', 'in', licitaciones_filtradas)])
-        self.licitaciones_ids = [(6, 0, licitaciones.ids)]
-  
-    # VERIFICAR FUNCIONAMIENTO...
-    def obtener_licitaciones_y_actualizar(self):
-        ticket = self.env['ir.config_parameter'].sudo().get_param('your.ticket.parameter')
-        codigos_externos = self.obtener_licitaciones_hoy(ticket)
-        keywords = self.keywords
-        self.obtener_licitaciones_gas(codigos_externos, ticket, keywords)
-
-    """
-    =================================================================
-                        FUNCIONES AUXILIARES
-    =================================================================
-    """
-
-    def is_null_int (self, variable):
-    
-        if variable:
-            return variable
-        else:
-            return 0
-    
-    def is_null_str (self, variable):
-        
-        if variable:
-            return variable
-        else:
-            return "NaN"
-
-    def is_null_date (self, variable):
-
-        if variable:
-            return variable
-        else:
-            return "1900-01-01"
-
-    def identificar_tipo_competidor(self, nombre_proveedor):
+    def extraccion_licitaciones_diarias(self):
         """
-        ## Descripción
-        Función que recibe por parametro una variable string con el nombre del proveedor y comprueba si pertenece a 'gasco' o 'lipigas', retornando la id correspondiente (1) para competidor directo y (2) para competidor indirecto.
-        ## Parámetros
-        - nombre_proveedor: str que contiene el nombre del proveedor
-        ## Retorna
-        - (número entero) que referencia a una id de tipo competidor.
-        """
-        if 'gasco' in nombre_proveedor.lower() or 'lipigas' in nombre_proveedor.lower():
-            return 1
-        else:
-            return 2 
-
-    def make_request_with_retries (self, url, params, max_retries=3):
-        """
-        ## Descripción
-        Función para realizar una solicitud con reintentos en caso de error de tiempo de espera.
-        """
-        for retry in range(max_retries):
-            try:
-                response = requests.get(url, params=params)
-                return response
-            except requests.exceptions.ReadTimeout as e:
-                _logger.info(f"Intento {retry+1} de {max_retries}. Error de tiempo de espera: {e}")
-                time.sleep(5)  # Esperar 5 segundos antes de reintentar
-    
-    # VERIFICAR UTILIDAD (?)
-    def poblamiento_inicial (self):
-        """
-        ## Descripción
-        Función que recibe por parámetro una lista de licitaciones y, para cada una de las ID de licitaciones, envía una petición a la API de mercadopublico.cl para recopilar información más detallada sobre esa ID. Repite este proceso tantas veces como licitaciones haya en la lista y luego exporta los datos a un archivo CSV.
-        ## Parámetros
-        - rutaArchivo: str con formato ruta\\archivo.csv, ej: 'Inputs\MuestraLicitacionesAdjudicadasGas.csv'.
-        - ticket: Ticket de la API Mercado Público (similar a un token de acceso, sin él no es posible interactuar con la API).
-        ## Retorna
-        - None
+        Función que recibe por parámetro una lista de licitaciones y, para cada una de las ID de licitaciones, 
+        envía una petición a la API de mercadopublico.cl para recopilar información más detallada sobre esa ID. 
+        Repite este proceso tantas veces como licitaciones haya en la lista y luego inserta la información en la base de datos.
         """
         # Contador ID's licitaciones
         count = 1
-        
-        ruta_archivo = 'Inputs/MuestraLicitacionesAdjudicadasGas.csv'
-
-        # Leer lista de licitaciones recibida por parámetro.
-        listado = pd.read_csv(rutaArchivo, sep=";")
-
-        # Crear lista que almacene únicamente la columna de ids de licitaciones
-        ids = listado['IDLicitacion']
-
-        # Restringir la columna de ids solo a la ID antes del primer ";"
-        ids = ids.apply(lambda x: x.split(';')[0])
 
         # Traer token mp desde configuración
         token_mp = self.env['ir.config_parameter'].sudo().get_param('licibot_module.token_mp')
 
+        # Listado de entrada 
+        listado = ['1057402-258-LE23','1057547-450-LE23','1562-91-LE23','1091-17-LE23','5196-91-L123','848-51-LE23','1778-84-LE23','1058078-26-LE23']
+        # Listado original (comentado para hacer pruebas)
+        ### listado = self.listar_licitaciones_diarias()
+        _logger.info(f"Licitaciones : {listado}")
+
         try:
             # Recorrer los elementos almacenados en la lista de ids de licitaciones
-            for id in ids:
-
+            for id in listado:
                 # Realizar petición de datos para la ID de licitación
                 url = 'https://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json'
                 args = {'codigo': id, 'ticket': token_mp}
                 response = self.make_request_with_retries(url, args)
                 _logger.info(f"\nID: {id} Status Code: {response} \n")
-                _logger.info(f"\nProcesando ({count}/{len(ids)})")
+                _logger.info(f"\nProcesando ({count}/{len(listado)})")
 
-                if response is not None and response.status_code == 200:
+                # >>>> Mover keywords y omitir_productos fuera del for(?) <<<<<<<<<<<<<<<<
+                keywords = ['Gas', 'Gas Licuado', 'Gas ciudad', 'Gas de petróleo licuefactado', 'Suministro de gas natural', 'Granel', 'VALES DE GAS', 'Vales', 'Centrales de gas', 
+                'Calderas de gas natural', 'Servicios de descontaminacion medioambiental', 'Servicios de asesoría de ciencias medioambientales', 'Generadores de gas', 
+                'Servicios de gasoductos', 'Construcción de sistema de fontanería o gasfiteria', 'Recarga de tanques de gas', 'Tanques o botellas de aire o gas', 
+                'Servicios de elevación por presión de gas de tubería adujada (en espiral)', 'Servicios de producción de gas natural', 
+                'Supervisión de instalación, ajuste o mantenimiento de calderas', 'Instalación estanque de abastecimiento de gas licuado y certificación sello verde', 
+                'Instalación, reparación o mantenimiento de sistemas de calefacción', 'Servicio de gasfiteria y alcantarillado', 'Combustibles, lubricantes y anticorrosivos', 
+                'Combustibles gaseosos y aditivos', 'Combustibles gaseosos', 'Servicios de elevación por presión de gas de tubería adujada (en espiral)', 
+                'Servicios de producción de gas natural', 'Tubería de cobre']
+                omitir_productos = ['agua', 'oxígeno', 'oxigeno', 'helio', 'medicos', 'medico', 'médico', 'médicos', 'xenón', 'xenon', 'nitrógeno', 'nitrogeno', 'argón', 'argon', 'anestesia',
+                'kriptón', 'neón', 'neon', 'radón', 'co2', 'dióxido', 'dioxido', 'soplete', 'motor', 'aceite']
+
+                if response and response.status_code == 200:
                     payload = response.json()
 
                     for item in payload['Listado']:
@@ -749,7 +693,7 @@ class Licitacion(models.Model):
                         }
 
                         adjudicacion = item.get('Adjudicacion')
-                        if adjudicacion is not None:
+                        if adjudicacion:
                             data['Adjudicacion_Tipo'] = adjudicacion.get('Tipo')
                             data['Adjudicacion_Fecha'] = adjudicacion.get('Fecha')
                             data['Adjudicacion_Numero'] = adjudicacion.get('Numero')
@@ -765,7 +709,6 @@ class Licitacion(models.Model):
                         # Agregar fila para cada item en el DataFrame
                         for i, item_data in enumerate(item.get('Items', {}).get('Listado', [])):
                             item_row = data.copy()
-
                             item_row.update({
                                 'Items_Correlativo': item_data.get('Correlativo'),
                                 'Items_CodigoProducto': item_data.get('CodigoProducto'),
@@ -779,26 +722,148 @@ class Licitacion(models.Model):
 
                             adjudicacion = item_data.get('Adjudicacion')
                             if adjudicacion is not None:
-                                item_row['Items_rut_proveedor'] = adjudicacion.get('rut_proveedor')
-                                item_row['Items_nombre_proveedor'] = adjudicacion.get('nombre_proveedor')
+                                item_row['Items_rut_proveedor'] = adjudicacion.get('RutProveedor')
+                                item_row['Items_nombre_proveedor'] = adjudicacion.get('NombreProveedor')
                                 item_row['Items_MontoUnitario'] = adjudicacion.get('MontoUnitario')
+                            
+                            related = False
 
+                            # Buscar palabras clave en los datos de la licitación y los productos
+                            for keyword in keywords:
+                                pattern = r'\b' + re.escape(keyword) + r'\b'
+                                if re.search(pattern, data['Nombre'], re.IGNORECASE) or \
+                                    re.search(pattern, data['Descripcion'], re.IGNORECASE) or \
+                                    re.search(pattern, item_row['Items_Descripcion'], re.IGNORECASE) or \
+                                    re.search(pattern, item_row['Items_Categoria'], re.IGNORECASE) or \
+                                    re.search(pattern, item_row['Items_NombreProducto'], re.IGNORECASE):
+                                    related = True
+                                    _logger.info(f"Se ha encontrado en ítem: {item_row['Items_Correlativo']} un componente relacionado: {keyword}")
+                                    break
+
+                            # Verificar si se deben omitir productos
+                            for exclude_keyword in omitir_productos:
+                                if exclude_keyword.lower() in item_row['Items_NombreProducto'].lower():
+                                    related = False
+                                    _logger.info(f"Se ha encontrado en ítem: {item_row['Items_Correlativo']} un posible filtro erróneo: {exclude_keyword}.")
+
+                            if related:
+                                _logger.info(f"Encontrada licitación relacionada a '{keyword}'. Realizando inserción de licitación y items relacionados")
+                                _logger.info(f"INSERTANDO A ORGANISMO")
+                                self.insertar_organismo (
+                                    data['Comprador_CodigoOrganismo'],
+                                    data['Comprador_NombreOrganismo']
+                                )
+                                _logger.info(f"INSERTANDO A UNIDAD DE COMPRA")
+                                self.insertar_unidadCompra (
+                                    data['Comprador_CodigoUnidad'],
+                                    data['Comprador_RutUnidad'].upper(),
+                                    data['Comprador_NombreUnidad'],
+                                    data['Comprador_DireccionUnidad'],
+                                    data['Comprador_ComunaUnidad'],
+                                    data['Comprador_RegionUnidad'],
+                                    data['Comprador_CodigoOrganismo'] # organismo_id
+                                )
+                                _logger.info(f"INSERTANDO A PROVEEDOR")
                                 self.insertar_proveedor (
                                     item_row['Items_rut_proveedor'],
                                     item_row['Items_nombre_proveedor']
                                 )
-
+                                _logger.info(f"INSERTANDO A CATEGORIA")
                                 self.insertar_categoria (
                                     item_row['Items_codigo_categoria'],
                                     item_row['Items_Categoria']
                                 )
-
+                                _logger.info(f"INSERTANDO A CODIGO PRODUCTO: {item_row['Items_NombreProducto']} ")
                                 self.insertar_productoServicio (
                                     item_row['Items_CodigoProducto'],
                                     item_row['Items_NombreProducto'],
                                     item_row['Items_codigo_categoria'] # categoria_id
                                 )
-
+                                _logger.info(f"INSERTANDO A ADJUDICACION")
+                                self.insertar_adjudicacion (
+                                    data['Adjudicacion_Numero'],
+                                    data['Adjudicacion_Fecha'],
+                                    data['Adjudicacion_NumeroOferentes'],
+                                    data['Adjudicacion_UrlActa'],
+                                    data['Adjudicacion_Tipo'] # tipo_acto_adm_id
+                                )
+                                _logger.info(f"INSERTANDO A LICITACION")
+                                self.insertar_licitacion (
+                                    data['CodigoExterno'], 
+                                    data['Nombre'], 
+                                    data['CodigoEstado'], 
+                                    data['Descripcion'],
+                                    data['FechaCierre1'], 
+                                    data['Estado'],
+                                    data['DiasCierreLicitacion'],
+                                    data['Informada'],
+                                    data['CodigoTipo'],
+                                    data['TipoConvocatoria'],
+                                    data['Etapas'], 
+                                    data['EstadoEtapas'],
+                                    data['TomaRazon'],
+                                    data['EstadoPublicidadOfertas'],
+                                    data['JustificacionPublicidad'],
+                                    data['Contrato'],
+                                    data['Obras'],
+                                    data['CantidadReclamos'],
+                                    data['FechaCreacion'],
+                                    data['FechaCierre2'],
+                                    data['FechaInicio'],
+                                    data['FechaFinal'],
+                                    data['FechaPubRespuestas'],
+                                    data['FechaActoAperturaTecnica'],
+                                    data['FechaActoAperturaEconomica'],
+                                    data['FechaPublicacion'],
+                                    data['FechaAdjudicacion'],
+                                    data['FechaEstimadaAdjudicacion'], 
+                                    data['FechaSoporteFisico'], 
+                                    data['FechaTiempoEvaluacion'],
+                                    data['FechaEstimadaFirma'], 
+                                    data['FechaUsuario'],
+                                    data['FechaVisitaTerreno'],
+                                    data['FechaEntregaAntecedentes'],
+                                    data['UnidadTiempoEvaluacion'],
+                                    data['DireccionVisita'],
+                                    data['DireccionEntrega'],
+                                    data['Estimacion'],
+                                    data['FuenteFinanciamiento'],
+                                    data['VisibilidadMonto'],
+                                    data['MontoEstimado'],
+                                    data['Tiempo'],
+                                    data['TipoPago'],
+                                    data['NombreResponsablePago'],
+                                    data['EmailResponsablePago'],
+                                    data['NombreResponsableContrato'],
+                                    data['EmailResponsableContrato'],
+                                    data['FonoResponsableContrato'],
+                                    data['ProhibicionContratacion'],
+                                    data['SubContratacion'],
+                                    data['TiempoDuracionContrato'],
+                                    data['JustificacionMontoEstimado'],
+                                    data['ObservacionContract'],
+                                    data['ExtensionPlazo'],
+                                    data['EsBaseTipo'],
+                                    data['UnidadTiempoContratoLicitacion'],
+                                    data['ValorTiempoRenovacion'],
+                                    data['PeriodoTiempoRenovacion'],
+                                    data['EsRenovable'],
+                                    data['Items_Cantidad'],
+                                    data['Comprador_CodigoUsuario'],
+                                    data['Comprador_RutUsuario'],
+                                    data['Comprador_NombreUsuario'],
+                                    data['Comprador_CargoUsuario'],
+                                    data['Adjudicacion_Numero'], # adjudicacion_id
+                                    data['Tipo'], # tipo_licitacion_id
+                                    data['UnidadTiempoEvaluacion'], # uni_tiempo_ev_id
+                                    data['Moneda'], # unidad_monetaria_id
+                                    data['VisibilidadMonto'], # monto_estimado_id
+                                    data['UnidadTiempoContratoLicitacion'], # uni_tiempo_con_id
+                                    data['Modalidad'], # modalidad_pago_id
+                                    data['Comprador_CodigoUnidad'] # UnidadCompra_codigoUnidad
+                                )
+                                _logger.info(f"INSERTANDO A ITEM DETALLES DE:")
+                                _logger.info(f"{item_row['Items_NombreProducto']}")
                                 self.insertar_item (
                                     item_row['Items_Correlativo'], 
                                     item_row['Items_UnidadMedida'],
@@ -809,120 +874,288 @@ class Licitacion(models.Model):
                                     item_row['Items_CodigoProducto'], # producto_servicio_id
                                     item_row['Items_rut_proveedor'] # proveedor_id
                                 )
-
-                                _logger.info(f"Los datos del item correlativo: {item_row['Items_Correlativo']} se han recopilado exitosamente.")
-                                    
-                        self.insertar_organismo (
-                            data['Comprador_CodigoOrganismo'],
-                            data['Comprador_NombreOrganismo']
-                        )
-
-                        self.insertar_unidadCompra (
-                            data['Comprador_CodigoUnidad'],
-                            data['Comprador_RutUnidad'].upper(),
-                            data['Comprador_NombreUnidad'],
-                            data['Comprador_DireccionUnidad'],
-                            data['Comprador_ComunaUnidad'],
-                            data['Comprador_RegionUnidad'],
-                            data['Comprador_CodigoOrganismo'] # organismo_id
-                        )
-
-                        self.insertar_adjudicacion (
-                            data['Adjudicacion_Numero'],
-                            data['Adjudicacion_Fecha'],
-                            data['Adjudicacion_NumeroOferentes'],
-                            data['Adjudicacion_UrlActa'],
-                            data['Adjudicacion_Tipo'] # tipo_acto_adm_id
-                        )
-
-                        self.insertar_licitacion (
-                            data['CodigoExterno'], 
-                            data['Nombre'], 
-                            data['CodigoEstado'], 
-                            data['Descripcion'],
-                            data['FechaCierre1'], 
-                            data['Estado'],
-                            data['DiasCierreLicitacion'],
-                            data['Informada'],
-                            data['CodigoTipo'],
-                            data['TipoConvocatoria'],
-                            data['Etapas'], 
-                            data['EstadoEtapas'],
-                            data['TomaRazon'],
-                            data['EstadoPublicidadOfertas'],
-                            data['JustificacionPublicidad'],
-                            data['Contrato'],
-                            data['Obras'],
-                            data['CantidadReclamos'],
-                            data['FechaCreacion'],
-                            data['FechaCierre2'],
-                            data['FechaInicio'],
-                            data['FechaFinal'],
-                            data['FechaPubRespuestas'],
-                            data['FechaActoAperturaTecnica'],
-                            data['FechaActoAperturaEconomica'],
-                            data['FechaPublicacion'],
-                            data['FechaAdjudicacion'],
-                            data['FechaEstimadaAdjudicacion'], 
-                            data['FechaSoporteFisico'], 
-                            data['FechaTiempoEvaluacion'],
-                            data['FechaEstimadaFirma'], 
-                            data['FechaUsuario'],
-                            data['FechaVisitaTerreno'],
-                            data['FechaEntregaAntecedentes'],
-                            data['UnidadTiempoEvaluacion'],
-                            data['DireccionVisita'],
-                            data['DireccionEntrega'],
-                            data['Estimacion'],
-                            data['FuenteFinanciamiento'],
-                            data['VisibilidadMonto'],
-                            data['MontoEstimado'],
-                            data['Tiempo'],
-                            data['TipoPago'],
-                            data['NombreResponsablePago'],
-                            data['EmailResponsablePago'],
-                            data['NombreResponsableContrato'],
-                            data['EmailResponsableContrato'],
-                            data['FonoResponsableContrato'],
-                            data['ProhibicionContratacion'],
-                            data['SubContratacion'],
-                            data['TiempoDuracionContrato'],
-                            data['JustificacionMontoEstimado'],
-                            data['ObservacionContract'],
-                            data['ExtensionPlazo'],
-                            data['EsBaseTipo'],
-                            data['UnidadTiempoContratoLicitacion'],
-                            data['ValorTiempoRenovacion'],
-                            data['PeriodoTiempoRenovacion'],
-                            data['EsRenovable'],
-                            data['Items_Cantidad'],
-                            data['Comprador_CodigoUsuario'],
-                            data['Comprador_RutUsuario'],
-                            data['Comprador_NombreUsuario'],
-                            data['Comprador_CargoUsuario'],
-                            data['Adjudicacion_Numero'], # adjudicacion_id
-                            data['Tipo'], # tipo_licitacion_id
-                            data['UnidadTiempoEvaluacion'], # uni_tiempo_ev_id
-                            data['Moneda'], # unidad_monetaria_id
-                            data['VisibilidadMonto'], # monto_estimado_id
-                            data['UnidadTiempoContratoLicitacion'], # uni_tiempo_con_id
-                            data['Modalidad'], # modalidad_pago_id
-                            data['Comprador_CodigoUnidad'] # UnidadCompra_codigoUnidad
-                        )
-
-                        _logger.info(f"Los datos de la licitacion ID: {id} se han recopilado exitosamente.")
-
+                                _logger.info(f"Los datos del item correlativo: {item_row['Items_Correlativo']} se han recopilado exitosamente.")    
+                            else:
+                                _logger.info(f"Se ha omitido la inserción del correlativo (item): {item_row['Items_Correlativo']}.")
                         count += 1
+                        _logger.info(f"Los datos de la litación ID: {id} se han procesado exitosamente.")
                 else:
-                    _logger.info(f"Error al realizar la solicitud a la API para la ID: {id}. Código de Estado: {response.status_code} : {response.reason}")
+                    _logger.info("Error al realizar la solicitud a la API para la ID:", id, "Código de Estado:", response.status_code,
+                    ":", response.reason)
                     count += 1
 
                 # Esperar 2 segundos entre cada solicitud para evitar errores
-                time.sleep(2)
-
+                time.sleep(5)
+        
         except KeyboardInterrupt:
             # Capturar la señal de "Ctrl + C" para detener la ejecución
-            _logger.info("Se ha detenido la ejecución. Guardando los datos recopilados hasta ahora en la base de datos.")
+            print("Se ha detenido la ejecución. Guardando los datos recopilados hasta ahora en la base de datos.")
+
+    """
+    =================================================================
+                        FUNCIONES PARA EL RANKING
+    =================================================================
+    """
+    def calculo_rankingv1(self):
+        '''
+        Función que calcula el ranking para los primeros 20 codigos de unidad de compra de la vista licibot_ranking_v1.
+        Primero, limpia todos los registros para el campo ranking en la tabla UnidadCompra.
+        Segundo, crea una lista con los codigos de unidad de compra en la vista licibot_ranking_v1.
+        Tercero, recorre esa lista y para los primeros 20 elementos asigna de forma secuencial el ranking.
+        '''
+        _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: Calculo Ranking v1 <<<\n\n\n''')
+
+        # Limpiar todos los valores del campo "ranking" en el modelo UnidadCompra
+        self.env.cr.execute("UPDATE licibot_unidad_compra SET ranking = NULL;")
+
+        # Recuperar la lista de rut_unidad de la vista licibot_ranking_v1
+        ranking_length = int(self.env['ir.config_parameter'].sudo().get_param('licibot_module.ranking_length'))
+        self.env.cr.execute(f'SELECT "ID Unidad de Compra" FROM licibot_ranking_v1 LIMIT {ranking_length};')
+        id_unidad_list = list(line[0] for line in self.env.cr.fetchall())
+
+        # Inicializar el contador de ranking
+        pos_ranking = 1
+
+        # Recorrer los primeros 20 elementos de la lista
+        for id_unidad in id_unidad_list: 
+
+            # Buscar y actualizar el campo "ranking" en el modelo UnidadCompra
+            unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('id', '=', id_unidad)])
+            unidad_compra.sudo().write({'ranking': pos_ranking})
+            
+            # Incrementar el contador de ranking para el siguiente valor
+            pos_ranking += 1
+
+        _logger.info('''\n\n\n>>> Finalizando CRON Licibot: Calculo Ranking v1<<<\n\n\n''')        
+
+    def calcular_ranking_ml(self):
+        _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: Calcular Ranking ML <<<\n\n\n''')
+
+        # Cargar el archivo que contiene el modelo de ML
+        kmeans_model = pickle.load(open('opt/addons_opens/licibot_module/Inputs/kmeans_pca2.sav', 'rb'))
+
+        # Generar un PCA a partir de la información de la base de datos.
+        self.env.cr.execute("""
+            SELECT 
+                idunidad,
+                licitacionestotales,
+                totalgastado,
+                gasto2022,
+                diferenciaanterior2023,
+                proveedores2022,
+                proveedores2023,
+                competenciaotros,
+                valorpromediocompra,
+                cantidadtrabajadores,
+                clientenuevo
+            FROM licibot_variables_kmeans;
+            """)
+
+        query_result = self.env.cr.fetchall()
+
+        # Convierte los resultados en un DataFrame
+        df = pd.DataFrame(query_result, columns=["idunidad", 
+        "licitacionestotales", 
+        "totalgastado", 
+        "gasto2022", 
+        "diferenciaanterior2023", 
+        "proveedores2022", 
+        "proveedores2023", 
+        "competenciaotros", 
+        "valorpromediocompra", 
+        "cantidadtrabajadores", 
+        "clientenuevo"])
+
+        _logger.info('''\n\n\n
+        Imprime DF head 10:
+        %s
+        \n\n\n
+        ''', df.head(10))
+
+        # Replicando el Componente Principal de Análisis (PCA) 
+        scaler = StandardScaler()
+        scaler.fit(df)
+        scaled_df = pd.DataFrame(scaler.transform(df),columns= df.columns)
+        pca = PCA(n_components=3)
+        pca.fit(scaled_df)
+        PCA_df = pd.DataFrame(pca.transform(scaled_df), columns=(["col1","col2", "col3"]))
+        _logger.info('''\n\n\n
+        Describing PCA:
+        %s
+        \n\n\n
+        ''', PCA_df.describe().T)
+
+        # Generar una predicción utilizando el modelo desde el archivo .sav.
+        pred = kmeans_model.predict(PCA_df)
+
+        # Sobreescribir la información de la predicción en la base de datos.
+        df['Segment K-means PCA'] = pred
+        _logger.info(f'''\n\n\n
+        Showing DataFrame ... :
+        {df.head(100)}
+        \n\n\n
+        ''')
+
+        df_cluster_0 = df[(df["Segment K-means PCA"] == 0)]
+        _logger.info(f'''\n\n\n
+        Showing DF Cluster 0 ...:
+        Total: {len(df_cluster_0)}
+        {df_cluster_0.head(50)}
+        \n\n\n
+        ''')
+
+        df_cluster_2 = df[(df["Segment K-means PCA"] == 2)]
+        _logger.info(f'''\n\n\n
+        Showing DF Cluster 2 ...:
+        Total: {len(df_cluster_2)}
+        {df_cluster_2.head(50)}
+        \n\n\n
+        ''')
+
+        # Generar lista con los  clusters.
+        # Filtra las filas con cluster 0 o 2
+        filtro = (df['Segment K-means PCA'] == 0) | (df['Segment K-means PCA'] == 2)
+        df_filtrado = df[filtro]
+
+        # Crea una lista con los IDs
+        uc_list = df_filtrado['idunidad'].tolist()
+        _logger.info(f'''\n\n\n
+        Showing uc_list ... :
+        {uc_list}
+        \n\n\n
+        ''')
+
+        uc_list_str = ', '.join(map(str, uc_list))
+        _logger.info(f'''\n\n\n
+        Showing uc_list_str ... :
+        {uc_list_str}
+        \n\n\n
+        ''')
+        
+        # Rankear los Clusters de interes (0 y 2)
+        clusters_rank = f"""
+        CREATE OR REPLACE VIEW licibot_ranking_ml AS
+        SELECT 
+            licibot_unidad_compra.id AS "ID Unidad de Compra",
+            licibot_unidad_compra.nombre_unidad as "Nombre de Unidad de Compra",
+            SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2022-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2022-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) AS "Monto Total Año Anterior",
+            SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2023-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2023-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) AS "Monto Total Año Actual",
+            SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2022-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2022-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) -
+            SUM(CASE WHEN licibot_licitacion.fecha_adjudicacion >= DATE '2023-01-01' AND licibot_licitacion.fecha_adjudicacion <= DATE '2023-12-31' THEN licibot_item_licitacion.cant_unitaria_prod * licibot_item_licitacion.monto_unitario ELSE 0 END) AS "Monto Diferencial"
+        FROM 
+            licibot_unidad_compra 
+            JOIN licibot_licitacion ON licibot_unidad_compra.id = licibot_licitacion.unidad_compra_id
+            JOIN licibot_item_licitacion ON licibot_licitacion.id = licibot_item_licitacion.licitacion_id
+        WHERE
+            licibot_unidad_compra.id IN ({uc_list_str})
+        GROUP BY 
+            licibot_unidad_compra.id
+        ORDER BY
+            "Monto Diferencial" DESC;
+        """
+        tools.drop_view_if_exists(self._cr, 'licibot_ranking_ml')
+        self.env.cr.execute(clusters_rank)
+
+        # Limpiar todos los valores del campo "ranking" en el modelo UnidadCompra
+        self.env.cr.execute("UPDATE licibot_unidad_compra SET ranking = NULL;")
+
+        # Recuperar la lista de rut_unidad de la vista licibot_ranking_ml
+        ranking_length = int(self.env['ir.config_parameter'].sudo().get_param('licibot_module.ranking_length'))
+        self.env.cr.execute(f'SELECT "ID Unidad de Compra" FROM licibot_ranking_ml LIMIT {ranking_length};')
+        id_unidad_list = list(line[0] for line in self.env.cr.fetchall())
+
+        # Inicializar el contador de ranking
+        pos_ranking = 1
+
+        # Recorrer los primeros 20 elementos de la lista
+        for id_unidad in id_unidad_list: 
+
+            # Buscar y actualizar el campo "ranking" en el modelo UnidadCompra
+            unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('id', '=', id_unidad)])
+            unidad_compra.sudo().write({'ranking': pos_ranking})
+            
+            # Incrementar el contador de ranking para el siguiente valor
+            pos_ranking += 1
+
+        _logger.info('''\n\n\n>>> Finalizando CRON Licibot: Calcular Ranking ML <<<\n\n\n''')
+
+    """
+    =================================================================
+                        FUNCIONES AUXILIARES
+    =================================================================
+    """
+
+    def is_null_int (self, variable):
+    
+        if variable:
+            return variable
+        else:
+            return 0
+    
+    def is_null_str (self, variable):
+        
+        if variable:
+            return variable
+        else:
+            return "NaN"
+
+    def is_null_date (self, variable):
+
+        if variable:
+            return variable
+        else:
+            return "1900-01-01"
+
+    # Al ejecutarla a las 23 hrs me entregaba la fecha actual, pasado las 00 funcionó
+    def fecha_dia_anterior(self):
+        fecha_actual = datetime.date.today()
+        fecha_anterior = fecha_actual - datetime.timedelta(days=1)
+        fecha_anterior_str = fecha_anterior.strftime("%d%m%Y")
+        return fecha_anterior_str
+
+    def convertir_fecha(self, fecha_str):
+        if fecha_str in ("null", "Null", "NULL", None):
+            return None
+        else:
+            try:
+                # Convierte la fecha en un objeto datetime
+                fecha_obj = parse(fecha_str)
+
+                # Formatea la fecha en el formato deseado
+                fecha_formateada = fecha_obj.strftime("%Y-%m-%d %H:%M:%S")
+                
+                return fecha_formateada
+
+            except ValueError:
+                # Si no se puede analizar el formato
+                return None
+
+    def identificar_tipo_competidor(self, nombre_proveedor):
+        """
+        ## Descripción
+        Función que recibe por parametro una variable string con el nombre del proveedor y comprueba si pertenece a 'gasco' o 'lipigas', retornando la id correspondiente (1) para competidor directo y (2) para competidor indirecto.
+        ## Parámetros
+        - nombre_proveedor: str que contiene el nombre del proveedor
+        ## Retorna
+        - (número entero) que referencia a una id de tipo competidor.
+        """
+        if 'gasco' in nombre_proveedor.lower() or 'lipigas' in nombre_proveedor.lower():
+            return 1
+        else:
+            return 2
+
+    def make_request_with_retries (self, url, params, max_retries=3):
+        """
+        ## Descripción
+        Función para realizar una solicitud con reintentos en caso de error de tiempo de espera.
+        """
+        for retry in range(max_retries):
+            try:
+                response = requests.get(url, params)
+                return response
+            except requests.exceptions.ReadTimeout as e:
+                _logger.info(f"Intento {retry+1} de {max_retries}. Error de tiempo de espera: {e}")
+                time.sleep(5)  # Esperar 5 segundos antes de reintentar
 
     # VERIFICAR UTILIDAD (?)
     def licitaciones_semana_anterior (self):
@@ -943,44 +1176,6 @@ class Licitacion(models.Model):
             TODO Falta por agregar la lógica que busque todas aquellas licitaciones que X variable de fecha este dentro de lunes-domingo semana anterior y la agregue a un listado
             luego debera retornar ese listado (ya sea de id's o de codigo_externo) 
         '''
-
-    def calculo_rankingv1(self):
-        '''
-        Función que calcula el ranking para los 20 primeros rut_unidad de la vista RANKING_V1.
-        Primero, limpia todos los registros para el campo ranking en la tabla UnidadCompra.
-        Segundo, crea una lista con los rut_unidad en la vista RANKING_V1.
-        Tercero, recorre esa lista y para los primeros 20 elementos asigna de forma secuencial el ranking.
-        '''
-        _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: Calculo Ranking_V1 <<<\n\n\n''')
-
-        # Limpiar todos los valores del campo "ranking" en el modelo UnidadCompra
-        self.env.cr.execute("UPDATE licibot_unidad_compra SET ranking = NULL;")
-
-        # Recuperar la lista de rut_unidad de la vista RANKING_V1
-        ranking_length = int(self.env['ir.config_parameter'].sudo().get_param('licibot_module.ranking_length'))
-        _logger.info(ranking_length)
-        _logger.info(type(ranking_length))
-        self.env.cr.execute(f'SELECT "ID Unidad de Compra" FROM RANKING_V1 LIMIT {ranking_length};')
-        id_unidad_list = list(line[0] for line in self.env.cr.fetchall())
-
-        # Inicializar el contador de ranking
-        pos_ranking = 1
-
-        # Recorrer los primeros 20 elementos de la lista
-        for id_unidad in id_unidad_list: 
-
-            # Buscar y actualizar el campo "ranking" en el modelo UnidadCompra
-            unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('id', '=', id_unidad)])
-            unidad_compra.sudo().write({'ranking': pos_ranking})
-            
-            # Incrementar el contador de ranking para el siguiente valor
-            pos_ranking += 1
-
-        _logger.info('''\n\n\n>>> Finalizando CRON Licibot: Calculo Ranking_v1 <<<\n\n\n''')
-
-    def get_fecha_actual(self):
-        fecha_actual = fields.Date.today()
-        return fecha_actual
 
     # Funcion innecesaria actualmente (?)
     def generate_pickle (self):
@@ -1017,203 +1212,71 @@ class Licitacion(models.Model):
         pickle_K = 'opt/addons_opens/licibot_module/Inputs/kmeans_pca_odoo.sav'
         pickle.dump(kmeans_pca, open(pickle_K, 'wb'))
 
-    def ml_model(self):
-        _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: ML Model K-Means <<<\n\n\n''')
-
-        # Cargar el archivo que contiene el modelo de ML
-        kmeans_model = pickle.load(open('opt/addons_opens/licibot_module/Inputs/kmeans_pca2.sav', 'rb'))
-
-        # Generar un PCA a partir de la información de la base de datos.
-        self.env.cr.execute("""
-            SELECT 
-                idunidad,
-                licitacionestotales,
-                totalgastado,
-                gasto2022,
-                diferenciaanterior2023,
-                proveedores2022,
-                proveedores2023,
-                competenciaotros,
-                valorpromediocompra,
-                cantidadtrabajadores,
-                clientenuevo
-            FROM licibot_variables_kmeans;
-            """)
-
-        query_result = self.env.cr.fetchall()
-
-        # Convierte los resultados en un DataFrame
-        df = pd.DataFrame(query_result, columns=["idunidad", "licitacionestotales", "totalgastado", "gasto2022", "diferenciaanterior2023", "proveedores2022", "proveedores2023", "competenciaotros", "valorpromediocompra", "cantidadtrabajadores", "clientenuevo"])
-
-        _logger.info('''\n\n\n
-        Imprime DF head 10:
-        %s
-        \n\n\n
-        ''', df.head(10))
-
-        # Replicando el Componente Principal de Análisis (PCA) 
-        scaler = StandardScaler()
-        scaler.fit(df)
-        scaled_df = pd.DataFrame(scaler.transform(df),columns= df.columns)
-        _logger.info("All features are now scaled ...")
-
-        pca = PCA(n_components=3)
-        pca.fit(scaled_df)
-        PCA_df = pd.DataFrame(pca.transform(scaled_df), columns=(["col1","col2", "col3"]))
-        _logger.info('''\n\n\n
-        Describing PCA:
-        %s
-        \n\n\n
-        ''', PCA_df.describe().T)
-
-        kmeans_pca = KMeans(n_clusters = 4, init = 'k-means++', random_state = 42)
-        kmeans_pca.fit(PCA_df)
-        _logger.info('PCA kmeans calculated? ... OK')
-
-        df_segm_pca_kmeans = pd.concat([df.reset_index(drop = True), pd.DataFrame(PCA_df)], axis = 1)
-        df_segm_pca_kmeans.columns.values[-3: ] = ['col1', 'col2', 'col3']
-
-        df_segm_pca_kmeans['Segment K-means PCA'] = kmeans_pca.labels_
-        _logger.info('''\n\n\n
-        Showing dataframe segment pca kmeans ...:
-        %s
-        \n\n\n
-        ''', df_segm_pca_kmeans.iloc[:, :5])
-
-        _logger.info('''\n\n\n
-        Showing dataframe segment pca kmeans INFO ...:
-        %s
-        \n\n\n
-        ''', df_segm_pca_kmeans.info(verbose=True))
-
-        df_last_3_columns = df_segm_pca_kmeans.iloc[:, -4:]
-
-        _logger.info('''\n\n\n
-        Showing dataframe last 4 columns ...:
-        %s
-        \n\n\n
-        ''', df_last_3_columns.head(25))
-
-        # Analisis de clusters
-        # _logger.info('''
-        # \n\n\n
-        # > > > Clusters analisis < < <
-        # \n\n\n
-        # ''')
-
-        # selected_columns = df_segm_pca_kmeans[['nombre_unidad', 'competencia_otros', 'Segment K-means PCA']]
-        # _logger.info('''\n\n\n
-        # Showing Selected Columns ...:
-        # %s
-        # \n\n\n
-        # ''', selected_columns.head(25))
-
-        # analisiscluster = df_segm_pca_kmeans[(df_segm_pca_kmeans["Segment K-means PCA"] == 0)]
-        # _logger.info('''\n\n\n
-        # Showing Clusters 0 Analisis ...:
-        # %s
-        # \n\n\n
-        # ''', analisiscluster.head(50))
-
-        # analisiscluster = df_segm_pca_kmeans[(df_segm_pca_kmeans["Segment K-means PCA"] == 1)]
-        # _logger.info('''\n\n\n
-        # Showing Clusters 1 Analisis ...:
-        # %s
-        # \n\n\n
-        # ''', analisiscluster.head(50))
-
-        # analisiscluster = df_segm_pca_kmeans[(df_segm_pca_kmeans["Segment K-means PCA"] == 2)]
-        # _logger.info('''\n\n\n
-        # Showing Clusters 2 Analisis ...:
-        # %s
-        # \n\n\n
-        # ''', analisiscluster.head(50))
-
-        # analisiscluster = df_segm_pca_kmeans[(df_segm_pca_kmeans["Segment K-means PCA"] == 3)]
-        # _logger.info('''\n\n\n
-        # Showing Clusters 3 Analisis ...:
-        # %s
-        # \n\n\n
-        # ''', analisiscluster.head(50))
-
-        # pickle.dump(kmeans_pca, open('opt/addons_opens/licibot_module/Inputs/kmeans_pca_odoo.sav', 'wb'))
-        
-        # Generar una predicción utilizando el modelo desde el archivo .sav.
-        # pred = kmeans_pca.predict(PCA_df)
-        # df['Segment K-means PCA'] = pred
-
-        # Sobreescribir la información de la predicción en la base de datos.
-
-        # Generar los clusters.
-
-        # Rankear los Clusters de interes (0 y 2)
-
-        # Asignar una "marca" a las unidades de compra rankeadas
-
-        _logger.info('''\n\n\n>>> Finalizando CRON Licibot: ML Model K-Means <<<\n\n\n''')
-
     def easter_egg(self):
-        _logger.info('''
+        """
+        Para ver esta funcion ejecutar en consola el comando 'tail -f /var/log/odoo/odoo-server.log'
+        """
+    _logger.info('''
 
 
-                    ===++***#***###**##**###########%%%%%%#%%%%%%%%%%%%%%%%%%%%%%%%#*%%%@###%%%@%%@%%%%%%%%%%%%%
-                    =============++*+**++***+**++======++*%%%%%%%%%%%%%%%%%%@%%%%@#*@@@%%%%%%@@@@%@@%@%%%%%%%%%%
-                    ==========------------------=:...::..:-====++%%##%##%#%%@%#%@**%%%*###%@%%%%#%%%%%%@%%%%%%@%
-                    =============----=-----::::..                .. .:.-:+#%%%%@#*%%#####%%%%@@%%%%%%%%%%%%%%%%%
-                    ===============---:::..                               .-+#%#*%%*%%#%@#%@@@%@%@@@%%%%@@@@@%%%
-                    +==============---.                                   ...:+=*%*%%#%%%@%%%%@@%@%%@%%@@@@%%@%%
-                    ++======-==----:.....                   ...... ... .     ...=*#%#%%@@%%%%%%%%%%%@@@@@@@%@%%%
-                    +++====------:.......       .. ..  ...........................=*#%@@@%%%%@@@@@@%@@@@@@@%@%@@
-                    ======---::... .   . ..... .  .................................=+#%%##%%%###*%%@%%@@@@@@%%%#
-                    ==-----::....   ......:::..............................:.::::... .=+*%#%###**#%%%@@@@@%%#**+
-                    +==--::............:-----::::::::.::...........:::...::::----:..   .:--+*##**##%@@@@%@%#****
-                    ==-:::......:.....:::==---------::::::..........:..:::-------:........:-+*+++#%%@@@%@@%%#***
-                    --::....:::::::-:::...:---====---::::::........:::::-------:::..........:-=***#%%%%%%%%%#***
-                    =:...:-=+++++*+=+=-::::---=====--::::::.... ...::::-------::::-:::::-::::::--*###%%%%%%%****
-                    :...:-+***########*+===-========------::::.....:::::--------==++**####*+-::...-=++*#%%%%****
-                    ...::-=+*##**#%%%%%#*+++++===---------:::.....:::::::---===+**#%%%%%%###*=-...:::-+**#%%#***
-                    :::::--=++*#%%%%%%%%%#**+++=====-==-----:..::::::-:::--=+++*#%%%%%%######*=....:--+*##%%****
-                    ---------==+*#%%%%%%%%#****+=--=====--=-:::.::::::::::-=**#%%%%%%%%%%%###+-:.....:-=+#%%****
-                    -=============++*#%%%%%%#*#+==---==--=---:::::::::::::-=*#%%%%@@%%%%@%%#*=-:::...  .-=*#*+**
-                    ======+++++++======++*###++++=-=====-------::--:::::::-=+#%%%@%@%%%%%*=-::--:-::.....:+#*+*#
-                    ======++++===++==---=++=++++==+==---------::::::::::-:-==+*+++==--------------=-:.:::.:+****
-                    ============+++++++++++++++++===---::----::::::::::::--===-------==-======+=+==--:::::.=**##
-                    ===============-=====++========------::::::::::::::::---::=======++======+=====------::-*#%%
-                    ====----------:::::::::::::-------:::::.::::::::..::::--:::::-====-====--------==---=-::+#%%
-                    =====---=-----:..........:.:::----::::::::-::::::.::::-::::..:..:::.::::::::------=--:::-*%%
-                    +++=====--:-:.... ........::::----:-----:----:::::::-----::::..........:::::-----=====---+*#
-                    +++======--:::..........:::::-------------=----:::-----=--:-::.:.......:-=====--=+=======+*#
-                    +=++======--::.....::::-:----------===---===-=-------=---:::::::::::.:::--++===-==+==+====+*
-                    ======+===-::..:::::::::::--======++===========-----------::----::::...::--+++=-==-=+=+*%%%%
-                    ++======---:::::::::-----==+***++++=========+===----------:---=--::::::::-===--===+++++***#%
-                    **+++++==---::::-:-----=+********++++++==+++++=+=====-=-----====++=------:-===-===+*#%@@@@@@
-                    ********+==---========+****+++****++++++***+*+*+++===++++=-=---==+***++=====+++++++++=+=+=++
-                    *******+=======+++++*##*++++++*###***************++++++++=----===+++***+=+++=+===+***###****
-                    ******++++++*++++*#%%#**++++++**######******************+==-====+*****##+=+**##%%%%%%%%%%%%#
-                    #*+++++==+++**#####*####*#***+**##%%##################*+====+++*******##+==+*******#*#######
-                    %##*+++++++********###***********###################**+++++++**+++*****++++++**##%%%%%%%%%%%
-                    #%##****++++++++==+##*#*******+****#################******+++++*#***++++++****#%%%#*****####
-                    %%%##*+++++++****++*##%%###*************##########***********##%#**++++++#*+*##%%##%%%%%%%%#
-                    #**####*#*++++*#*++***#%%%%%#####*##*****#########****#******####**+==+++*+==+++*#####%%%%%%
-                    ###%%##***+*++++**+**########**+***********######**+**++=*++##*#*+++++*****+=+*#*##########%
-                    ####**####**+++++****##########++#+=+***=-+++*#*+=-=+*+-:+*###********####*=+=-+########%%%#
-                    ##*####%#####*********####*####*++===-*-::----*+:...:=:.:####*******####***++++-=*%%#######%
-                    #%%%%%%###%###*********#*#########+=--+-..::-:-=....-**#%###******#######**++++=::-=+*######
-                    #%%%###%%%##%###**#****##*#*#####%%%%%%*-::.::=*+=+*######******##########***++*=...:-=+**##
-                    %%####%#%#%#%######********####%%%%%##%%%%%%%%%%%#######******######%%#%##***++*+:....:-++**
-                    %%%%##%%%%%%##%%%%##*******#***######%%%%%#%%#########*****+*#####%#%%%%%#*******-......:-+*
-                    %%%###%%%%#%###%%%%%##*****#*##****################*****+**#####%%#%%%%%%##**###*-::......:=
-                    %%#%%%########%##%%%%%#*****###****************************##%##%%#%%%%%%########-:::::::.::
-                    %#%%%%%#######%%%%%%%%%##*****#****#******************++**##%%%%%%%%%%%%%########-::::..:..:
-                    #%%%%%%##%###%#%%%%%%%%%%#*********#***##************++**####%%%%%%%%%%%###%###%#--::::::::.
+                ===++***#***###**##**###########%%%%%%#%%%%%%%%%%%%%%%%%%%%%%%%#*%%%@###%%%@%%@%%%%%%%%%%%%%
+                =============++*+**++***+**++======++*%%%%%%%%%%%%%%%%%%@%%%%@#*@@@%%%%%%@@@@%@@%@%%%%%%%%%%
+                ==========------------------=:...::..:-====++%%##%##%#%%@%#%@**%%%*###%@%%%%#%%%%%%@%%%%%%@%
+                =============----=-----::::..                .. .:.-:+#%%%%@#*%%#####%%%%@@%%%%%%%%%%%%%%%%%
+                ===============---:::..                               .-+#%#*%%*%%#%@#%@@@%@%@@@%%%%@@@@@%%%
+                +==============---.                                   ...:+=*%*%%#%%%@%%%%@@%@%%@%%@@@@%%@%%
+                ++======-==----:.....                   ...... ... .     ...=*#%#%%@@%%%%%%%%%%%@@@@@@@%@%%%
+                +++====------:.......       .. ..  ...........................=*#%@@@%%%%@@@@@@%@@@@@@@%@%@@
+                ======---::... .   . ..... .  .................................=+#%%##%%%###*%%@%%@@@@@@%%%#
+                ==-----::....   ......:::..............................:.::::... .=+*%#%###**#%%%@@@@@%%#**+
+                +==--::............:-----::::::::.::...........:::...::::----:..   .:--+*##**##%@@@@%@%#****
+                ==-:::......:.....:::==---------::::::..........:..:::-------:........:-+*+++#%%@@@%@@%%#***
+                --::....:::::::-:::...:---====---::::::........:::::-------:::..........:-=***#%%%%%%%%%#***
+                =:...:-=+++++*+=+=-::::---=====--::::::.... ...::::-------::::-:::::-::::::--*###%%%%%%%****
+                :...:-+***########*+===-========------::::.....:::::--------==++**####*+-::...-=++*#%%%%****
+                ...::-=+*##**#%%%%%#*+++++===---------:::.....:::::::---===+**#%%%%%%###*=-...:::-+**#%%#***
+                :::::--=++*#%%%%%%%%%#**+++=====-==-----:..::::::-:::--=+++*#%%%%%%######*=....:--+*##%%****
+                ---------==+*#%%%%%%%%#****+=--=====--=-:::.::::::::::-=**#%%%%%%%%%%%###+-:.....:-=+#%%****
+                -=============++*#%%%%%%#*#+==---==--=---:::::::::::::-=*#%%%%@@%%%%@%%#*=-:::...  .-=*#*+**
+                ======+++++++======++*###++++=-=====-------::--:::::::-=+#%%%@%@%%%%%*=-::--:-::.....:+#*+*#
+                ======++++===++==---=++=++++==+==---------::::::::::-:-==+*+++==--------------=-:.:::.:+****
+                ============+++++++++++++++++===---::----::::::::::::--===-------==-======+=+==--:::::.=**##
+                ===============-=====++========------::::::::::::::::---::=======++======+=====------::-*#%%
+                ====----------:::::::::::::-------:::::.::::::::..::::--:::::-====-====--------==---=-::+#%%
+                =====---=-----:..........:.:::----::::::::-::::::.::::-::::..:..:::.::::::::------=--:::-*%%
+                +++=====--:-:.... ........::::----:-----:----:::::::-----::::..........:::::-----=====---+*#
+                +++======--:::..........:::::-------------=----:::-----=--:-::.:.......:-=====--=+=======+*#
+                +=++======--::.....::::-:----------===---===-=-------=---:::::::::::.:::--++===-==+==+====+*
+                ======+===-::..:::::::::::--======++===========-----------::----::::...::--+++=-==-=+=+*%%%%
+                ++======---:::::::::-----==+***++++=========+===----------:---=--::::::::-===--===+++++***#%
+                **+++++==---::::-:-----=+********++++++==+++++=+=====-=-----====++=------:-===-===+*#%@@@@@@
+                ********+==---========+****+++****++++++***+*+*+++===++++=-=---==+***++=====+++++++++=+=+=++
+                *******+=======+++++*##*++++++*###***************++++++++=----===+++***+=+++=+===+***###****
+                ******++++++*++++*#%%#**++++++**######******************+==-====+*****##+=+**##%%%%%%%%%%%%#
+                #*+++++==+++**#####*####*#***+**##%%##################*+====+++*******##+==+*******#*#######
+                %##*+++++++********###***********###################**+++++++**+++*****++++++**##%%%%%%%%%%%
+                #%##****++++++++==+##*#*******+****#################******+++++*#***++++++****#%%%#*****####
+                %%%##*+++++++****++*##%%###*************##########***********##%#**++++++#*+*##%%##%%%%%%%%#
+                #**####*#*++++*#*++***#%%%%%#####*##*****#########****#******####**+==+++*+==+++*#####%%%%%%
+                ###%%##***+*++++**+**########**+***********######**+**++=*++##*#*+++++*****+=+*#*##########%
+                ####**####**+++++****##########++#+=+***=-+++*#*+=-=+*+-:+*###********####*=+=-+########%%%#
+                ##*####%#####*********####*####*++===-*-::----*+:...:=:.:####*******####***++++-=*%%#######%
+                #%%%%%%###%###*********#*#########+=--+-..::-:-=....-**#%###******#######**++++=::-=+*######
+                #%%%###%%%##%###**#****##*#*#####%%%%%%*-::.::=*+=+*######******##########***++*=...:-=+**##
+                %%####%#%#%#%######********####%%%%%##%%%%%%%%%%%#######******######%%#%##***++*+:....:-++**
+                %%%%##%%%%%%##%%%%##*******#***######%%%%%#%%#########*****+*#####%#%%%%%#*******-......:-+*
+                %%%###%%%%#%###%%%%%##*****#*##****################*****+**#####%%#%%%%%%##**###*-::......:=
+                %%#%%%########%##%%%%%#*****###****************************##%##%%#%%%%%%########-:::::::.::
+                %#%%%%%#######%%%%%%%%%##*****#****#******************++**##%%%%%%%%%%%%%########-::::..:..:
+                #%%%%%%##%###%#%%%%%%%%%%#*********#***##************++**####%%%%%%%%%%%###%###%#--::::::::.
 
-                            "Cuando los tiempos fueron difíciles... 
-                        Y los errores de código y estres abundaban... 
-                            Este sujeto siempre estubo allí... 
-                                para sacarnos una sonrisa...
-                            ...Te recordaremos michi sonriente..."
-                    
-                    ''')
+                        "Cuando los tiempos fueron difíciles... 
+                    Y los errores de código y estres abundaban... 
+                        Este sujeto siempre estubo allí... 
+                            para sacarnos una sonrisa...
+                        ...Te recordaremos michi sonriente..."
+                
+                ''')
 
     """
     =================================================================
@@ -1227,12 +1290,11 @@ class Licitacion(models.Model):
         server_ip = self.env['ir.config_parameter'].sudo().get_param('licibot_module.ip')
         url = f'http://{server_ip}:8069/token'
         response = requests.get(url)
-        _logger.info(f'ol_crm_get_token: {response.status_code}')
+        _logger.info(f'api crm status: {response.status_code}')
 
         if response.status_code == 200:
             data = response.json() 
             token = data["token"]
-            _logger.info(f'ol_crm_get_token: {token}')
             return token
         else:
             _logger.info(f"\n Error al obtener el token. Código de estado: {response.status_code}")
@@ -1253,25 +1315,7 @@ class Licitacion(models.Model):
         return json
 
     def ol_crm_send_info (self):
-        '''Función que buscará en la base de datos las licitaciones de la semana anterior. Si algúna de ellas pertenece a una unidad de compra rankeada (20 puestos)
-        será enviada su información al CRM de Odoo'''
-
-        # Si el token esta activo realizar proceso, si el token venció pedir nuevo token (?)
-        token_crm = self.ol_crm_get_token()
-
-        url = 'http://173.255.243.74:8069/licitaciones'
-        headers = {'Authorization': token}
-        response = requests.post(url, headers=headers, json=json)
-
-        '''
-            ///////////////////////////////////////////////////////////////////////////////////
-                 ////     ////       W O R K    I N    P R O G R E S S   ////    ////    ////
-            ///////////////////////////////////////////////////////////////////////////////////
-        '''
-
-    def ol_crm_send_info_provisoria (self):
-        '''De momento dado que la api de mercadopublico sigue caída lo que se quiere es que teniendo en consideración el ranking, se busque y se envie al CRM
-        la información de la última licitación registrada en la base de datos para cada una de esas unidades de compra dentro del ranking (20 en total)'''
+        '''Función que envía al CRM la lista de unidades de compra rankeadas. La cantidad enviada depende del parametro configurado en odoo'''
 
         server_ip = self.env['ir.config_parameter'].sudo().get_param('licibot_module.ip')
         _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: Envío al CRM <<<\n\n\n''')
@@ -1294,14 +1338,11 @@ class Licitacion(models.Model):
             fecha_ultima_oportunidad = self.env.cr.fetchone()
 
             fecha_actual = datetime.date.today()
-            # _logger.info(f"# # # # Tipo fecha_actual: {type(fecha_actual)} Valor {fecha_actual} # # # # ")
             diff_dias_permitidos = int(self.env['ir.config_parameter'].sudo().get_param('licibot_module.days_gone'))
 
             # Cuando exista la fecha de ultima oportunidad la calcula, caso contrario asigna un valor a la diff_real para entender que no existen registros de esa unidad de compra
             if fecha_ultima_oportunidad:
-                # _logger.info(f"# # # # Tipo fecha ultima oportunidad: {type(fecha_ultima_oportunidad)} Valor {fecha_ultima_oportunidad} # # # # ")
                 fecha_ultima_oportunidad = datetime.date(fecha_ultima_oportunidad[0].year, fecha_ultima_oportunidad[0].month, fecha_ultima_oportunidad[0].day)
-                # _logger.info(f"# # # # Tipo fecha ultima oportunidad (DESPUES): {type(fecha_ultima_oportunidad)} Valor {fecha_ultima_oportunidad} # # # # ")
                 diff_real = int((fecha_actual - fecha_ultima_oportunidad).total_seconds() / 60 / 60 / 24)
             else:
                 diff_real = 9999999
@@ -1373,14 +1414,11 @@ class Licitacion(models.Model):
                 headers = {'Authorization': token}
                 response = requests.post(url, headers=headers, json=json)
                 
-                # _logger.info(f"Respuesta de API CRM: Código {response.status_code}")
-
         _logger.info('''\n\n\n>>> Finalizando CRON Licibot: Envío al CRM <<<\n\n\n''')
 
 class ProductoServicio (models.Model):
     _name = 'licibot.producto.servicio'
 
-    # id_producto_servicio = fields.Integer(string = 'ID Producto Servicio')
     nom_prod_servicio = fields.Char(string = 'Nombre Producto Servicio')
     categoria_id = fields.Many2one('licibot.categoria', string='categoria_id')
 
@@ -1401,7 +1439,7 @@ class ItemLicitacion (models.Model):
         modulo que contenga el modelo por herencia, es importante el decorador @api.model_cr'''
 
         query = '''
-        CREATE OR REPLACE VIEW ranking_v1 AS
+        CREATE OR REPLACE VIEW licibot_ranking_v1 AS
         SELECT 
             licibot_unidad_compra.id AS "ID Unidad de Compra",
             licibot_unidad_compra.nombre_unidad as "Nombre de Unidad de Compra",
@@ -1419,7 +1457,7 @@ class ItemLicitacion (models.Model):
             "Monto Diferencial" DESC;
         '''
 
-        tools.drop_view_if_exists(self._cr, 'ranking_v1')
+        tools.drop_view_if_exists(self._cr, 'licibot_ranking_v1')
         self.env.cr.execute(query)
 
         vista_variables = '''
