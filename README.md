@@ -1,5 +1,8 @@
-![licibot banner](licibot_module/static/banner.png)
-<center> <h2>Licibot</h2> </center>
+<h2 align="center">
+  <p align="center">Licibot</p>
+  <p align="center"><img src="licibot_module/static/banner.png" align="center"></p>
+</h2>
+
 - **Technical Name**: licibot_module
 - **Version**: 15.0.0.1.0
 - **Author**: Ricardo Araya, Daniel Vásquez, Esteban Soto, Nicolas Pinilla
@@ -43,9 +46,9 @@ falla o caída de esta puede afectar al correcto funcionamiento del módulo.
 
 ### Contribuidores
 - Nicolas Pinilla 
-- Ricardo Araya ![Ricardo Araya LinkedIn](https://www.linkedin.com/in/ricardo-araya-calfio/)
-- Daniel Vásquez ![Daniel Vásquez LinkedIn](https://www.linkedin.com/in/daniel-vasquez-r/)
-- Esteban Soto ![Esteban Soto LinkedIn](https://www.linkedin.com/in/esteban-soto-valenzuela/)
+- [![LinkedIn Logo](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/ricardo-araya-calfio/ "Perfil de Ricardo Araya C.") Ricardo Araya C.
+- [![LinkedIn Logo](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/daniel-vasquez-r/ "Perfil de Daniel Vásquez R.") Daniel Vásquez R. 
+- [![LinkedIn Logo](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/esteban-soto-valenzuela/ "Perfil de Esteban Soto V.") Esteban Soto V.
 
-![Licibot Logo](licibot_module/static/banner.png "Licibot")
+![Licibot Logo](licibot_module/static/banner.png "Licibot") 
 
