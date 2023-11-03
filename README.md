@@ -1,5 +1,5 @@
-![licibot banner](static/banner.png)
-<center> <h2>Licibot1</h2> </center>
+![licibot banner](licibot_module/static/banner.png)
+<center> <h2>Licibot</h2> </center>
 - **Technical Name**: licibot_module
 - **Version**: 15.0.0.1.0
 - **Author**: Ricardo Araya, Daniel Vásquez, Esteban Soto, Nicolas Pinilla
@@ -47,5 +47,5 @@ falla o caída de esta puede afectar al correcto funcionamiento del módulo.
 - Daniel Vásquez ![Daniel Vásquez LinkedIn](https://www.linkedin.com/in/daniel-vasquez-r/)
 - Esteban Soto ![Esteban Soto LinkedIn](https://www.linkedin.com/in/esteban-soto-valenzuela/)
 
-![Licibot Logo](static/banner.png "Licibot")
+![Licibot Logo](licibot_module/static/banner.png "Licibot")
 
