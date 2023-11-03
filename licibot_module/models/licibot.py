@@ -227,14 +227,16 @@ class Licitacion(models.Model):
  
         if codigo_organismo:
 
-            cod_org_clean = int(codigo_organismo.strip())
+            cod_org_clean = codigo_organismo.strip()
 
             organismo_exists = self.env['licibot.organismo'].sudo().search([('id', '=', cod_org_clean)])
             
             if organismo_exists:
                 _logger.info(f"El organismo {cod_org_clean}: {nombre_organismo}, ya existe en la base de datos")
             else:
-                self.env['licibot.organismo'].sudo().create({'id': cod_org_clean, 'nombre_organismo': nombre_organismo})
+                # self.env['licibot.organismo'].sudo().create({'id': cod_org_clean, 'nombre_organismo': nombre_organismo})
+                query_insertar_organismo = f'''insert into licibot_organismo (id, nombre_organismo) values ('{cod_org_clean}','{nombre_organismo}');'''
+                self.env.cr.execute(query_insertar_organismo)
 
         else:
             _logger.info(f"!!! Código organismo nulo. Omitiendo inserción de datos en tabla organismo...")
@@ -244,27 +246,33 @@ class Licitacion(models.Model):
         
         if codigo_unidad:
 
-            uc_clean = int(codigo_unidad.strip())
+            uc_clean = codigo_unidad.strip()
             cod_org_clean = int(organismo_id.strip())
 
             unidadCompra_exists = self.env['licibot.unidad.compra'].sudo().search([('id', '=', uc_clean)])
+            ### Intención de traer la ID de organismo
+            # cod_org_clean = self.env['licibot.organismo'].sudo().search([('id','=', organismo_id)])
 
             if unidadCompra_exists:
                 _logger.info(f"La unidad de compra {uc_clean}: {nombre_unidad}, ya existe en la base de datos.")
             else:
-                self.env['licibot.unidad.compra'].sudo().create({
-                    'id' : uc_clean, 
-                    'rut_unidad' : rut_unidad.strip(), 
-                    'nombre_unidad' : nombre_unidad.strip(), 
-                    'direccion_unidad' : direccion_unidad.strip(), 
-                    'comuna_unidad' : comuna_unidad.strip(), 
-                    'region_unidad' : region_unidad.strip(), 
-                    'organismo_id' : self.is_null_int(cod_org_clean)
-                })    
+                # self.env['licibot.unidad.compra'].sudo().create({
+                #     'id' : uc_clean, 
+                #     'rut_unidad' : rut_unidad.strip(), 
+                #     'nombre_unidad' : nombre_unidad.strip(), 
+                #     'direccion_unidad' : direccion_unidad.strip(), 
+                #     'comuna_unidad' : comuna_unidad.strip(), 
+                #     'region_unidad' : region_unidad.strip(), 
+                #     'organismo_id' : self.is_null_int(cod_org_clean.id) ## FK NULA EN BD
+                # })    
+                query_insertar_uc = f'''
+                insert into licibot_unidad_compra (id, rut_unidad, nombre_unidad, direccion_unidad, comuna_unidad, region_unidad, organismo_id) 
+                values ('{uc_clean}','{rut_unidad.strip()}', '{nombre_unidad.strip()}', '{direccion_unidad.strip()}', '{comuna_unidad.strip()}', '{region_unidad.strip()}', {cod_org_clean});'''
+                self.env.cr.execute(query_insertar_uc)
         else:
             _logger.info(f"!!! código unidad nulo. Omitiendo inserción de datos en tabla unidad...")
    
-    # Falta testing
+    # Falta testing. ID AUTOMATICA POR ODOO
     def insertar_proveedor(self, rut_proveedor, nombre_proveedor):
         
         if rut_proveedor:
@@ -294,32 +302,41 @@ class Licitacion(models.Model):
             if categoria_exists:
                 _logger.info(f"La categoría {cod_cat_clean}: {nom_categoria} ya existe en la base de datos.")
             else:
-                self.env['licibot.categoria'].sudo().create({
-                    'id': cod_cat_clean,
-                    'nom_categoria': nom_categoria.strip(),
-                })
+                # self.env['licibot.categoria'].sudo().create({
+                #     'id': cod_cat_clean,
+                #     'nom_categoria': nom_categoria.strip(),
+                # })
+                query_insertar_categoria = f'''
+                insert into licibot_categoria (id, nom_categoria) 
+                values ('{cod_cat_clean}','{nom_categoria.strip()}');'''
+                self.env.cr.execute(query_insertar_categoria)
         else:
             _logger.info("¡Código de categoría nulo. Omitiendo inserción de datos en la tabla categoría...")
    
     # Falta testing
     def insertar_productoServicio(self, codigo_producto, nom_prod_servicio, categoria_id):
-
         if codigo_producto:
             cod_cat_clean = int(categoria_id.strip())
             producto_servicio_exists = self.env['licibot.producto.servicio'].sudo().search([('id', '=', codigo_producto)])
+            ### Intención de traer la ID de categoria
+            # cod_cat_clean = self.env['licibot.organismo'].sudo().search([('id','=', categoria_id)])
 
             if producto_servicio_exists:
                 _logger.info(f"El producto/servicio {codigo_producto} {nom_prod_servicio} ya existe en la base de datos.")
             else:
-                self.env['licibot.producto.servicio'].sudo().create({
-                    'id': codigo_producto,
-                    'nom_prod_servicio': nom_prod_servicio.strip(),
-                    'categoria_id': self.is_null_int(cod_cat_clean),
-                })
+                # self.env['licibot.producto.servicio'].sudo().create({
+                #     'id': codigo_producto,
+                #     'nom_prod_servicio': nom_prod_servicio.strip(),
+                #     'categoria_id': self.is_null_int(cod_cat_clean),  
+                # })
+                query_insertar_ps = f'''
+                insert into licibot_producto_servicio (id, nom_prod_servicio, categoria_id) 
+                values ({codigo_producto},'{nom_prod_servicio.strip()}', {cod_cat_clean});'''
+                self.env.cr.execute(query_insertar_ps)
         else:
             _logger.info("¡ID de producto/servicio nulo. Omitiendo inserción de datos en la tabla producto/servicio...")
    
-    # Falta testing
+    # Falta testing. ID AUTOMATICA POR ODOO
     def insertar_adjudicacion(self, num_admin_adjudicacion, fecha_admin_adjudicacion, num_oferentes, url_acta, tipo_acto_admn_id):
         
         if num_admin_adjudicacion:
@@ -339,12 +356,8 @@ class Licitacion(models.Model):
                 })
         else:
             _logger.info("¡Adjudicacion Nula. Omitiendo inserción de datos en la tabla de Adjudicaciones...")
-   
-    # REVISAR CÓDIGO CONSIDERANDO ERRORES DE NORM. CONOCIDOS Y ID ASIGNADA POR ODOO.
-    ### AL EJECUTAR EL CRON SE VE EN CONSOLA QUE LOS CAMPOS SE ASIGNAN BIEN. EL 'id' QUE TIENE EL NEXTVAL PERO NO LO RECONOCE.
-    ### CADA VEZ QUE SE EJECUTA EL CRON, EL id AUMENTA EN 1 (HUBIERA QUE EJECUTARLO 9340 VECES PARA ALCANZAR EL ULTIMO ID DE LICITACION)
-    ### ¿PROBABLEMENTE ALGO MAL EN LA FUNCIÓN DE EXTRACCIÓN? (LOS CAMPOS SE VEN BIEN DISTRIBUIDOS EN LA CONSOLA)
-    ### FOTO (CRON EJECUTADO 13 VECES): https://prnt.sc/mrloKAlhPEx-    
+     
+    # Falta testing. ID AUTOMATICA POR ODOO
     def insertar_licitacion (
         self,
         codigo_externo, 
@@ -411,22 +424,22 @@ class Licitacion(models.Model):
         rut_contacto, 
         nom_contacto, 
         cargo_contacto, 
-        adjudicacion_id, 
+        adjudicacion_id, # ID ODOO
         tipo_licitacion_id, 
-        uni_tiempo_ev_id, 
-        unidad_monetaria_id, 
-        monto_estimado_id, 
-        uni_tiempo_con_id, 
-        modalidad_pago_id, 
-        unidad_compra_id 
+        uni_tiempo_ev_id,
+        unidad_monetaria_id,
+        monto_estimado_id,
+        uni_tiempo_con_id,
+        modalidad_pago_id,
+        unidad_compra_id # ID MP
         ):
-
-        tipo_licitacion_select = self.env['licibot.tipo.licitacion'].sudo().search([('id_tipo_licitacion','=', tipo_licitacion_id)])
-        tipo_id_monetaria = self.env['licibot.unidad.monetaria'].sudo().search([('id_unidad_monetaria','=', unidad_monetaria_id)])
         num_adj = self.env['licibot.adjudicacion'].sudo().search([('num_admin_adjudicacion','=', adjudicacion_id)])
-        select_uni_comp = self.env['licibot.unidad.compra'].sudo().search([('id', '=', unidad_compra_id)])
+        clean_uc = int(unidad_compra_id.strip())
+        # tipo_licitacion_select = self.env['licibot.tipo.licitacion'].sudo().search([('id_tipo_licitacion','=', tipo_licitacion_id)])
+        # tipo_id_monetaria = self.env['licibot.unidad.monetaria'].sudo().search([('id_unidad_monetaria','=', unidad_monetaria_id)])
+        # select_uni_comp = self.env['licibot.unidad.compra'].sudo().search([('id', '=', unidad_compra_id)])
         # select_monto_est = self.env['licibot.monto.unitario'].sudo().search([('')])
-
+        
         if codigo_externo:
             licitacion_existe = self.env['licibot.licitacion'].sudo().search([('codigo_externo', '=', codigo_externo)])
             if licitacion_existe:
@@ -497,20 +510,19 @@ class Licitacion(models.Model):
                     'rut_contacto' : self.is_null_str(rut_contacto), 
                     'nom_contacto' : nom_contacto, 
                     'cargo_contacto' : cargo_contacto, 
-                    'adjudicacion_id' : self.is_null_int(num_adj.id),  
-                    'tipo_licitacion_id' : tipo_licitacion_select.id,           
-                    'uni_tiempo_ev_id' : self.is_null_int(uni_tiempo_ev_id),        
-                    'unidad_monetaria_id' : tipo_id_monetaria.id, 
-                    'monto_estimado_id' : self.is_null_int(monto_estimado_id), 
-                    'uni_tiempo_con_id' : self.is_null_int(uni_tiempo_con_id), 
-                    'modalidad_pago_id' : self.is_null_int(modalidad_pago_id), 
-                    'unidad_compra_id' : self.is_null_int(select_uni_comp.id) 
-                })
+                    'adjudicacion_id' : num_adj.id,  
+                    'tipo_licitacion_id' : self.normalize_tipo_licitacion(tipo_licitacion_id),           
+                    'uni_tiempo_ev_id' : self.normalize_uni_tiempo_ev(uni_tiempo_ev_id),        
+                    'unidad_monetaria_id' : self.normalize_unidad_monetaria(unidad_monetaria_id), 
+                    'monto_estimado_id' : self.normalize_monto_estimado(monto_estimado_id), 
+                    'uni_tiempo_con_id' : self.normalize_uni_tiempo_con(uni_tiempo_con_id), 
+                    'modalidad_pago_id' : self.normalize_modalidad_pago(modalidad_pago_id), 
+                    'unidad_compra_id' : clean_uc})
 
         else:
             _logger.info("¡ID de producto/servicio nulo. Omitiendo inserción de datos en la tabla producto/servicio...")
 
-    # Falta testing
+    # Falta testing. ID AUTOMATICA POR ODOO
     def insertar_item (
         self,
         correlativo, 
@@ -524,6 +536,8 @@ class Licitacion(models.Model):
 
         licitacion_select = self.env['licibot.licitacion'].sudo().search([('codigo_externo','=', licitacion_id.strip())])
         proveedor_select = self.env['licibot.proveedor'].sudo().search([('rut_proveedor','=', proveedor_id.strip())])
+        ### Intención de traer la ID de producto
+        # producto_select = self.env['licibot.producto.servicio'].sudo().search([('id','=', producto_servicio_id)])
 
         self.env['licibot.item.licitacion'].sudo().create({
             'correlativo' : correlativo, 
@@ -531,9 +545,9 @@ class Licitacion(models.Model):
             'cant_unitaria_prod' : cant_unitaria_prod, 
             'monto_unitario' : monto_unitario, 
             'desc_producto' : desc_producto, 
-            'licitacion_id' : self.is_null_int(licitacion_select.id), 
-            'producto_servicio_id' : self.is_null_int(producto_select), 
-            'proveedor_id' : self.is_null_int(proveedor_select.id)
+            'licitacion_id' : licitacion_select.id, 
+            'producto_servicio_id' : producto_servicio_id,
+            'proveedor_id' : proveedor_select.id
             })
 
     """
@@ -579,8 +593,22 @@ class Licitacion(models.Model):
         # Traer token mp desde configuración
         token_mp = self.env['ir.config_parameter'].sudo().get_param('licibot_module.token_mp')
 
+        # Definición de palabras clave para traer licitaciones relacionadas al negocio del gas
+        keywords = ['Gas', 'Gas Licuado', 'Gas ciudad', 'Gas de petróleo licuefactado', 'Suministro de gas natural', 'Granel', 'VALES DE GAS', 'Vales', 'Centrales de gas', 
+        'Calderas de gas natural', 'Servicios de descontaminacion medioambiental', 'Servicios de asesoría de ciencias medioambientales', 'Generadores de gas', 
+        'Servicios de gasoductos', 'Construcción de sistema de fontanería o gasfiteria', 'Recarga de tanques de gas', 'Tanques o botellas de aire o gas', 
+        'Servicios de elevación por presión de gas de tubería adujada (en espiral)', 'Servicios de producción de gas natural', 
+        'Supervisión de instalación, ajuste o mantenimiento de calderas', 'Instalación estanque de abastecimiento de gas licuado y certificación sello verde', 
+        'Instalación, reparación o mantenimiento de sistemas de calefacción', 'Servicio de gasfiteria y alcantarillado', 'Combustibles, lubricantes y anticorrosivos', 
+        'Combustibles gaseosos y aditivos', 'Combustibles gaseosos', 'Servicios de elevación por presión de gas de tubería adujada (en espiral)', 
+        'Servicios de producción de gas natural', 'Tubería de cobre']
+
+        # Definición de palabras que pueden involucrar gas o categorias relacionadas a gas pero no son de interés para el negocio (agua con gas, recarga de tanques, etc.)
+        omitir_productos = ['agua', 'oxígeno', 'oxigeno', 'helio', 'medicos', 'medico', 'médico', 'médicos', 'xenón', 'xenon', 'nitrógeno', 'nitrogeno', 'argón', 'argon', 'anestesia',
+        'kriptón', 'neón', 'neon', 'radón', 'co2', 'dióxido', 'dioxido', 'soplete', 'motor', 'aceite']
+
         # Listado de entrada 
-        listado = ['1057402-258-LE23','1057547-450-LE23','1562-91-LE23','1091-17-LE23','5196-91-L123','848-51-LE23','1778-84-LE23','1058078-26-LE23']
+        listado = ['1091-17-LE23','5196-91-L123','848-51-LE23', '1080095-17-L123']
         # Listado original (comentado para hacer pruebas)
         ### listado = self.listar_licitaciones_diarias()
         _logger.info(f"Licitaciones : {listado}")
@@ -594,18 +622,6 @@ class Licitacion(models.Model):
                 response = self.make_request_with_retries(url, args)
                 _logger.info(f"\nID: {id} Status Code: {response} \n")
                 _logger.info(f"\nProcesando ({count}/{len(listado)})")
-
-                # >>>> Mover keywords y omitir_productos fuera del for(?) <<<<<<<<<<<<<<<<
-                keywords = ['Gas', 'Gas Licuado', 'Gas ciudad', 'Gas de petróleo licuefactado', 'Suministro de gas natural', 'Granel', 'VALES DE GAS', 'Vales', 'Centrales de gas', 
-                'Calderas de gas natural', 'Servicios de descontaminacion medioambiental', 'Servicios de asesoría de ciencias medioambientales', 'Generadores de gas', 
-                'Servicios de gasoductos', 'Construcción de sistema de fontanería o gasfiteria', 'Recarga de tanques de gas', 'Tanques o botellas de aire o gas', 
-                'Servicios de elevación por presión de gas de tubería adujada (en espiral)', 'Servicios de producción de gas natural', 
-                'Supervisión de instalación, ajuste o mantenimiento de calderas', 'Instalación estanque de abastecimiento de gas licuado y certificación sello verde', 
-                'Instalación, reparación o mantenimiento de sistemas de calefacción', 'Servicio de gasfiteria y alcantarillado', 'Combustibles, lubricantes y anticorrosivos', 
-                'Combustibles gaseosos y aditivos', 'Combustibles gaseosos', 'Servicios de elevación por presión de gas de tubería adujada (en espiral)', 
-                'Servicios de producción de gas natural', 'Tubería de cobre']
-                omitir_productos = ['agua', 'oxígeno', 'oxigeno', 'helio', 'medicos', 'medico', 'médico', 'médicos', 'xenón', 'xenon', 'nitrógeno', 'nitrogeno', 'argón', 'argon', 'anestesia',
-                'kriptón', 'neón', 'neon', 'radón', 'co2', 'dióxido', 'dioxido', 'soplete', 'motor', 'aceite']
 
                 if response and response.status_code == 200:
                     payload = response.json()
@@ -884,7 +900,7 @@ class Licitacion(models.Model):
                     ":", response.reason)
                     count += 1
 
-                # Esperar 2 segundos entre cada solicitud para evitar errores
+                # Esperar 5 segundos entre cada solicitud para evitar errores
                 time.sleep(5)
         
         except KeyboardInterrupt:
@@ -928,6 +944,9 @@ class Licitacion(models.Model):
 
         _logger.info('''\n\n\n>>> Finalizando CRON Licibot: Calculo Ranking v1<<<\n\n\n''')        
 
+    """ 
+    TODO Falta por mejorar acorde a lo conversado en la última reunion
+    """
     def calcular_ranking_ml(self):
         _logger.info('''\n\n\n>>> Ejecutando CRON Licibot: Calcular Ranking ML <<<\n\n\n''')
 
@@ -1106,6 +1125,80 @@ class Licitacion(models.Model):
         else:
             return "1900-01-01"
 
+    def normalize_tipo_licitacion (self, tipo_licitacion):
+        # Limpia el string utilizando strip
+        clean_string = tipo_licitacion.strip()
+    
+        # Lista de valores permitidos
+        valores_permitidos = [
+            "L1", "LE", "LP", "LQ", "LR", "LS", "A1", "B1", "E1", "F1",
+            "J1", "CO", "B2", "A2", "D1", "E2", "C2", "C1", "F2", "F3",
+            "G2", "G1", "R1", "CA", "SE", "R2", "COT"
+        ]
+
+        # Comprueba si el string limpio está en la lista de valores permitidos
+        if clean_string in valores_permitidos:
+            select_tipo_lic = self.env['licibot.tipo.licitacion'].sudo().search([('id_tipo_licitacion','=', clean_string)])
+            return int(select_tipo_lic.id)
+        else:
+            return 0
+
+    def normalize_unidad_monetaria (self, unidad_monetaria):
+        # Limpia el string utilizando strip
+        clean_string = unidad_monetaria.strip()
+    
+        # Lista de valores permitidos
+        valores_permitidos = ["CLP", "CLF", "USD", "UTM", "EUR"]
+
+        # Comprueba si el string limpio está en la lista de valores permitidos
+        if clean_string in valores_permitidos:
+            select_uni_mon = self.env['licibot.unidad.monetaria'].sudo().search([('id_unidad_monetaria','=', clean_string)])
+            return int(select_uni_mon.id)
+        else:
+            return 0
+
+    def normalize_uni_tiempo_ev (self, uni_tiempo_ev):
+        # Lista de valores permitidos
+        valores_permitidos = [1, 2, 3, 4, 5]
+
+        # Comprueba si el string limpio está en la lista de valores permitidos
+        if uni_tiempo_ev in valores_permitidos:
+            return uni_tiempo_ev
+        else:
+            return 0
+
+    def normalize_uni_tiempo_con (self, uni_tiempo_con):
+
+        clean_uni_tiempo_con = int(uni_tiempo_con.strip())
+        # Lista de valores permitidos
+        valores_permitidos = [1, 2, 3, 4, 5]
+
+        # Comprueba si el string limpio está en la lista de valores permitidos
+        if clean_uni_tiempo_con in valores_permitidos:
+            return clean_uni_tiempo_con
+        else:
+            return 0
+
+    def normalize_monto_estimado (self, monto_estimado):
+        # Lista de valores permitidos
+        valores_permitidos = [1, 2]
+
+        # Comprueba si el string limpio está en la lista de valores permitidos
+        if monto_estimado in valores_permitidos:
+            return monto_estimado
+        else:
+            return 0
+
+    def normalize_modalidad_pago (self, modalidad_pago):
+        # Lista de valores permitidos
+        valores_permitidos = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+        # Comprueba si el string limpio está en la lista de valores permitidos
+        if modalidad_pago in valores_permitidos:
+            return modalidad_pago
+        else:
+            return 0
+
     # Al ejecutarla a las 23 hrs me entregaba la fecha actual, pasado las 00 funcionó
     def fecha_dia_anterior(self):
         fecha_actual = datetime.date.today()
@@ -1156,26 +1249,6 @@ class Licitacion(models.Model):
             except requests.exceptions.ReadTimeout as e:
                 _logger.info(f"Intento {retry+1} de {max_retries}. Error de tiempo de espera: {e}")
                 time.sleep(5)  # Esperar 5 segundos antes de reintentar
-
-    # VERIFICAR UTILIDAD (?)
-    def licitaciones_semana_anterior (self):
-        ''' Esta función debe buscar todos los códigos externos o id's de licitaciones que se hayan agregado la semana pasada (en el contexto de que el calculo del ranking
-        se haga de forma semanal, por ejemplo cada lunes.)
-        Retornara la lista de aquellas licitaciones'''
-        # Obtener la fecha de hoy
-        fecha_actual = datetime.date.today()
-
-        # Calcular la fecha del lunes de la semana anterior
-        delta_dias = (fecha_actual.weekday()) % 7  # 0 para lunes, 1 para martes, ..., 6 para domingo
-        fecha_lunes_semana_anterior = fecha_actual - datetime.timedelta(days=delta_dias, weeks=1)
-
-        # Calcular la fecha del domingo de la semana anterior
-        fecha_domingo_semana_anterior = fecha_lunes_semana_anterior + datetime.timedelta(days=6)
-
-        '''
-            TODO Falta por agregar la lógica que busque todas aquellas licitaciones que X variable de fecha este dentro de lunes-domingo semana anterior y la agregue a un listado
-            luego debera retornar ese listado (ya sea de id's o de codigo_externo) 
-        '''
 
     # Funcion innecesaria actualmente (?)
     def generate_pickle (self):
