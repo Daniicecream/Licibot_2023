@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <record id="calcular_ranking_v1" model="ir.cron">
-        <field name="name">CRON Licibot: Calcular Ranking v1</field>
+    <record id="extr_lic_diarias" model="ir.cron">
+        <field name="name">CRON Licibot: Extracción Licitaciones Diarias</field>
         <field name="model_id" ref="model_licibot_licitacion"/>
         <field name="interval_number">1</field>
-        <field name="interval_type">weeks</field>
+        <field name="interval_type">days</field>
         <field name="numbercall">-1</field>
-        <field name="code">model.calculo_rankingv1()</field>
+        <field name="code">model.extraccion_licitaciones_diarias()</field>
         <field name="active" eval="False" />
     </record>
 
@@ -21,6 +21,16 @@
         <field name="active" eval="False" />
     </record>
 
+    <record id="calcular_ranking_v1" model="ir.cron">
+        <field name="name">CRON Licibot: Calcular Ranking v1</field>
+        <field name="model_id" ref="model_licibot_licitacion"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">weeks</field>
+        <field name="numbercall">-1</field>
+        <field name="code">model.calculo_rankingv1()</field>
+        <field name="active" eval="False" />
+    </record>
+
     <record id="enviar_al_crm" model="ir.cron">
         <field name="name">CRON Licibot: Enviar al CRM</field>
         <field name="model_id" ref="model_licibot_licitacion"/>
@@ -28,26 +38,6 @@
         <field name="interval_type">weeks</field>
         <field name="numbercall">-1</field>
         <field name="code">model.ol_crm_send_info()</field>
-        <field name="active" eval="False" />
-    </record>
-
-    <record id="extr_lic_diarias" model="ir.cron">
-        <field name="name">CRON Licibot: Extracción Licitaciones Diarias</field>
-        <field name="model_id" ref="model_licibot_licitacion"/>
-        <field name="interval_number">1</field>
-        <field name="interval_type">days</field>
-        <field name="numbercall">-1</field>
-        <field name="code">model.extraccion_licitaciones_diarias()</field>
-        <field name="active" eval="False" />
-    </record>
-
-    <record id="prueba" model="ir.cron">
-        <field name="name">Prueba Licibot: ID Autoincremental</field>
-        <field name="model_id" ref="model_licibot_licitacion"/>
-        <field name="interval_number">1</field>
-        <field name="interval_type">weeks</field>
-        <field name="numbercall">-1</field>
-        <field name="code">model.insertar_prueba()</field>
         <field name="active" eval="False" />
     </record>
 

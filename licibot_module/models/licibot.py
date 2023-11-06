@@ -352,7 +352,7 @@ class Licitacion(models.Model):
                     'fecha_admin_adjudicacion': self.convertir_fecha(fecha_admin_adjudicacion),
                     'num_oferentes': self.is_null_int(num_oferentes),
                     'url_acta': self.is_null_str(url_acta),
-                    'tipo_acto_admin_id': self.is_null_int(tipo_acto_admn_id),
+                    'tipo_acto_admin_id': self.normalize_tipo_acto_admin(tipo_acto_admn_id),
                 })
         else:
             _logger.info("¡Adjudicacion Nula. Omitiendo inserción de datos en la tabla de Adjudicaciones...")
@@ -555,17 +555,21 @@ class Licitacion(models.Model):
                         FUNCIONES DE EXTRACCIÓN
     =================================================================
     """
-
-    # Funciona, entrega lista de licitaciones adjudicadas
+            
+    # Entrega lista de licitaciones adjudicadas (lista grande)
     def listar_licitaciones_diarias(self):
-        """
-        Esta función realiza una petición a la api de mercadopublico y retorna una lista con todos los codigos externos
-        de las licitaciones encontradas para la fecha del día anterior (se consulta el día anterior ya que de esta forma
-        se asegura que se dispone de la lista de licitaciones completa de un día).
-        """
+        
+        # Esta función realiza una petición a la api de mercadopublico y retorna una lista con todos los codigos externos
+        # de las licitaciones encontradas para la fecha del día anterior (se consulta el día anterior ya que de esta forma
+        # se asegura que se dispone de la lista de licitaciones completa de un día).
+        
         token_mp = self.env['ir.config_parameter'].sudo().get_param('licibot_module.token_mp')
         url = "https://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json"
         params = {'estado' : 'adjudicada', 'fecha': self.fecha_dia_anterior(), 'ticket': token_mp}
+
+        # Sólo para printear la fecha en el formato clásico
+        fecha_print = datetime.date.today()
+        fecha_print_anterior = fecha_print - datetime.timedelta(days=1)
 
         try:
             response = requests.get(url, params=params)
@@ -573,20 +577,19 @@ class Licitacion(models.Model):
 
             if 'Listado' in data:
                 codigos_externos = [item['CodigoExterno'] for item in data['Listado']]
-                _logger.info(f"Para el día {self.fecha_dia_anterior()} hay {len(codigos_externos)} licitaciones adjudicadas.)")
+                _logger.info(f"Para el día {fecha_print_anterior} hay {len(codigos_externos)} licitaciones adjudicadas.)")
                 return codigos_externos
             else:
-                return {'error': f'No se encontraron licitaciones adjudicadas para la fecha {self.fecha_dia_anterior()}'}
+                return {'error': f'No se encontraron licitaciones adjudicadas para la fecha {fecha_print_anterior}'}
 
         except requests.exceptions.RequestException as e:
             return {'error': f"Error en la solicitud a la API: {e}"}
 
     def extraccion_licitaciones_diarias(self):
-        """
-        Función que recibe por parámetro una lista de licitaciones y, para cada una de las ID de licitaciones, 
+        '''Función que recibe por parámetro una lista de licitaciones y, para cada una de las ID de licitaciones, 
         envía una petición a la API de mercadopublico.cl para recopilar información más detallada sobre esa ID. 
-        Repite este proceso tantas veces como licitaciones haya en la lista y luego inserta la información en la base de datos.
-        """
+        Repite este proceso tantas veces como licitaciones haya en la lista y luego inserta la información en la base de datos.'''
+        
         # Contador ID's licitaciones
         count = 1
 
@@ -608,10 +611,11 @@ class Licitacion(models.Model):
         'kriptón', 'neón', 'neon', 'radón', 'co2', 'dióxido', 'dioxido', 'soplete', 'motor', 'aceite']
 
         # Listado de entrada 
-        listado = ['1091-17-LE23','5196-91-L123','848-51-LE23', '1080095-17-L123']
+        # listado = ['1080095-17-L123','1091-17-LE23','5196-91-L123','848-51-LE23','3073-83-L123']
+
         # Listado original (comentado para hacer pruebas)
-        ### listado = self.listar_licitaciones_diarias()
-        _logger.info(f"Licitaciones : {listado}")
+        listado = self.listar_licitaciones_diarias()
+        # listado = lista
 
         try:
             # Recorrer los elementos almacenados en la lista de ids de licitaciones
@@ -620,292 +624,295 @@ class Licitacion(models.Model):
                 url = 'https://api.mercadopublico.cl/servicios/v1/publico/licitaciones.json'
                 args = {'codigo': id, 'ticket': token_mp}
                 response = self.make_request_with_retries(url, args)
-                _logger.info(f"\nID: {id} Status Code: {response} \n")
-                _logger.info(f"\nProcesando ({count}/{len(listado)})")
+                _logger.info(f"\nProceso licitaciones diarias : En ejecución ... ({count} de {len(listado)})")
 
                 if response and response.status_code == 200:
+                    
                     payload = response.json()
+                    datos_licitacion = payload.get('Listado', [])
 
-                    for item in payload['Listado']:
-                        data = {
-                            'CodigoExterno': item.get('CodigoExterno'),
-                            'Nombre': item.get('Nombre'),
-                            'CodigoEstado': item.get('CodigoEstado'),
-                            'Descripcion': item.get('Descripcion'),
-                            'FechaCierre1': item.get('FechaCierre'),
-                            'Estado': item.get('Estado'),
-                            'Comprador_CodigoOrganismo': item.get('Comprador', {}).get('CodigoOrganismo'),
-                            'Comprador_NombreOrganismo': item.get('Comprador', {}).get('NombreOrganismo'),
-                            'Comprador_RutUnidad': item.get('Comprador', {}).get('RutUnidad'),
-                            'Comprador_CodigoUnidad': item.get('Comprador', {}).get('CodigoUnidad'),
-                            'Comprador_NombreUnidad': item.get('Comprador', {}).get('NombreUnidad'),
-                            'Comprador_DireccionUnidad': item.get('Comprador', {}).get('DireccionUnidad'),
-                            'Comprador_ComunaUnidad': item.get('Comprador', {}).get('ComunaUnidad'),
-                            'Comprador_RegionUnidad': item.get('Comprador', {}).get('RegionUnidad'),
-                            'Comprador_RutUsuario': item.get('Comprador', {}).get('RutUsuario'),
-                            'Comprador_CodigoUsuario': item.get('Comprador', {}).get('CodigoUsuario'),
-                            'Comprador_NombreUsuario': item.get('Comprador', {}).get('NombreUsuario'),
-                            'Comprador_CargoUsuario': item.get('Comprador', {}).get('CargoUsuario'),
-                            'DiasCierreLicitacion': item.get('DiasCierreLicitacion'),
-                            'Informada': item.get('Informada'),
-                            'CodigoTipo': item.get('CodigoTipo'),
-                            'Tipo': item.get('Tipo'),
-                            'TipoConvocatoria': item.get('TipoConvocatoria'),
-                            'Moneda': item.get('Moneda'),
-                            'Etapas': item.get('Etapas'),
-                            'EstadoEtapas': item.get('EstadoEtapas'),
-                            'TomaRazon': item.get('TomaRazon'),
-                            'EstadoPublicidadOfertas': item.get('EstadoPublicidadOfertas'),
-                            'JustificacionPublicidad': item.get('JustificacionPublicidad'),
-                            'Contrato': item.get('Contrato'),
-                            'Obras': item.get('Obras'),
-                            'CantidadReclamos': item.get('CantidadReclamos'),
-                            'FechaCreacion': item.get('Fechas', {}).get('FechaCreacion'),
-                            'FechaCierre2': item.get('Fechas', {}).get('FechaCierre'),
-                            'FechaInicio': item.get('Fechas', {}).get('FechaInicio'),
-                            'FechaFinal': item.get('Fechas', {}).get('FechaFinal'),
-                            'FechaPubRespuestas': item.get('Fechas', {}).get('FechaPubRespuestas'),
-                            'FechaActoAperturaTecnica': item.get('Fechas', {}).get('FechaActoAperturaTecnica'),
-                            'FechaActoAperturaEconomica': item.get('Fechas', {}).get('FechaActoAperturaEconomica'),
-                            'FechaPublicacion': item.get('Fechas', {}).get('FechaPublicacion'),
-                            'FechaAdjudicacion': item.get('Fechas', {}).get('FechaAdjudicacion'),
-                            'FechaEstimadaAdjudicacion': item.get('Fechas', {}).get('FechaEstimadaAdjudicacion'),
-                            'FechaSoporteFisico': item.get('Fechas', {}).get('FechaSoporteFisico'),
-                            'FechaTiempoEvaluacion': item.get('Fechas', {}).get('FechaTiempoEvaluacion'),
-                            'FechaEstimadaFirma': item.get('Fechas', {}).get('FechaEstimadaFirma'),
-                            'FechaUsuario': item.get('Fechas', {}).get('FechaUsuario'),
-                            'FechaVisitaTerreno': item.get('Fechas', {}).get('FechaVisitaTerreno'),
-                            'FechaEntregaAntecedentes': item.get('Fechas', {}).get('FechaEntregaAntecedentes'),
-                            'UnidadTiempoEvaluacion': item.get('UnidadTiempoEvaluacion'),
-                            'DireccionVisita': item.get('DireccionVisita'),
-                            'DireccionEntrega': item.get('DireccionEntrega'),
-                            'Estimacion': item.get('Estimacion'),
-                            'FuenteFinanciamiento': item.get('FuenteFinanciamiento'),
-                            'VisibilidadMonto': item.get('VisibilidadMonto'),
-                            'MontoEstimado': item.get('MontoEstimado'),
-                            'Tiempo': item.get('Tiempo'),
-                            'UnidadTiempo': item.get('UnidadTiempo'),
-                            'Modalidad': item.get('Modalidad'),
-                            'TipoPago': item.get('TipoPago'),
-                            'NombreResponsablePago': item.get('NombreResponsablePago'),
-                            'EmailResponsablePago': item.get('EmailResponsablePago'),
-                            'NombreResponsableContrato': item.get('NombreResponsableContrato'),
-                            'EmailResponsableContrato': item.get('EmailResponsableContrato'),
-                            'FonoResponsableContrato': item.get('FonoResponsableContrato'),
-                            'ProhibicionContratacion': item.get('ProhibicionContratacion'),
-                            'SubContratacion': item.get('SubContratacion'),
-                            'UnidadTiempoDuracionContrato': item.get('UnidadTiempoDuracionContrato'),
-                            'TiempoDuracionContrato': item.get('TiempoDuracionContrato'),
-                            'TipoDuracionContrato': item.get('TipoDuracionContrato'),
-                            'JustificacionMontoEstimado': item.get('JustificacionMontoEstimado'),
-                            'ObservacionContract': item.get('ObservacionContract'),
-                            'ExtensionPlazo': item.get('ExtensionPlazo'),
-                            'EsBaseTipo': item.get('EsBaseTipo'),
-                            'UnidadTiempoContratoLicitacion': item.get('UnidadTiempoContratoLicitacion'),
-                            'ValorTiempoRenovacion': item.get('ValorTiempoRenovacion'),
-                            'PeriodoTiempoRenovacion': item.get('PeriodoTiempoRenovacion'),
-                            'EsRenovable': item.get('EsRenovable'),
-                            'Items_Cantidad': item.get('Items', {}).get('Cantidad')
-                        }
+                    for dato in datos_licitacion:
+                        codigo_externo = dato['CodigoExterno']
+                        nombre = dato['Nombre']
+                        codigo_estado = dato['CodigoEstado']
+                        descripcion = dato['Descripcion']
+                        fecha_cierre_1 = dato['FechaCierre']
+                        estado = dato['Estado']
+                        comprador = dato.get('Comprador', {})
+                        codigo_organismo = comprador['CodigoOrganismo']
+                        nombre_organismo = comprador['NombreOrganismo']
+                        rut_unidad = comprador['RutUnidad']
+                        codigo_unidad = comprador['CodigoUnidad']
+                        nombre_unidad = comprador['NombreUnidad']
+                        direccion_unidad = comprador['DireccionUnidad']
+                        comuna_unidad = comprador['ComunaUnidad']
+                        region_unidad = comprador['RegionUnidad']
+                        rut_comprador = comprador['RutUsuario']
+                        codigo_comprador = comprador['CodigoUsuario']
+                        nombre_comprador = comprador['NombreUsuario']
+                        cargo_comprador = comprador['CargoUsuario']
+                        dias_cierre_licitacion = dato['DiasCierreLicitacion']
+                        informada = dato['Informada']
+                        codigo_tipo = dato['CodigoTipo']
+                        tipo = dato['Tipo']
+                        tipo_convocatoria = dato['TipoConvocatoria']
+                        moneda = dato['Moneda']
+                        etapas = dato['Etapas']
+                        estado_etapas = dato['EstadoEtapas']
+                        toma_razon = dato['TomaRazon']
+                        estado_publicidad_ofertas = dato['EstadoPublicidadOfertas']
+                        justificacion_publicidad = dato['JustificacionPublicidad']
+                        contrato = dato['Contrato']
+                        obras = dato['Obras']
+                        cantidad_reclamos = dato['CantidadReclamos']
+                        fechas = dato.get('Fechas', {})
+                        fecha_creacion = fechas['FechaCreacion']
+                        fecha_cierre_2 = fechas['FechaCierre']
+                        fecha_inicio = fechas['FechaInicio']
+                        fecha_final = fechas['FechaFinal']
+                        fecha_pub_respuestas = fechas['FechaPubRespuestas']
+                        fecha_apertura_tecnica = fechas['FechaActoAperturaTecnica']
+                        fecha_apertura_economica = fechas['FechaActoAperturaEconomica']
+                        fecha_publicacion = fechas['FechaPublicacion']
+                        fecha_adjudicacion = fechas['FechaAdjudicacion']
+                        fecha_estimada_adjudicacion = fechas['FechaEstimadaAdjudicacion']
+                        fecha_soporte_fisico = fechas['FechaSoporteFisico']
+                        fecha_tiempo_evaluacion = fechas['FechaTiempoEvaluacion']
+                        fecha_estimada_firma = fechas['FechaEstimadaFirma']
+                        fecha_usuario = fechas['FechasUsuario']
+                        fecha_visita_terreno = fechas['FechaVisitaTerreno']
+                        fecha_entrega_antecedentes = fechas['FechaEntregaAntecedentes']
+                        unidad_tiempo_evaluacion = dato['UnidadTiempoEvaluacion']
+                        direccion_visitas = dato['DireccionVisita']
+                        direccion_entrega = dato['DireccionEntrega']
+                        estimacion = dato['Estimacion']
+                        fuente_financiamiento = dato['FuenteFinanciamiento']
+                        visibilidad_monto = dato['VisibilidadMonto']
+                        monto_estimado = dato['MontoEstimado']
+                        tiempo = dato['Tiempo']
+                        unidad_tiempo = dato['UnidadTiempo']
+                        modalidad = dato['Modalidad']
+                        tipo_pago = dato['TipoPago']
+                        nombre_reponsable_pago = dato['NombreResponsablePago']
+                        email_responsable_pago = dato['EmailResponsablePago']
+                        nombre_responsable_contrato = dato['NombreResponsableContrato']
+                        email_responsable_contrato = dato['EmailResponsableContrato']
+                        fono_responsable_contrato = dato['FonoResponsableContrato']
+                        prohibicion_contratacion = dato['ProhibicionContratacion']
+                        subcontratacion = dato['SubContratacion']
+                        unidad_tiempo_duracion_contrato = dato['UnidadTiempoDuracionContrato']
+                        tiempo_duracion_contrato = dato['TiempoDuracionContrato']
+                        tipo_duracion_contrato = dato['TipoDuracionContrato']
+                        justificacion_monto_estimado = dato['JustificacionMontoEstimado']
+                        observacion_contract = dato['ObservacionContract']
+                        extension_plazo = dato['ExtensionPlazo']
+                        es_base_tipo = dato['EsBaseTipo']
+                        unidad_tiempo_contrato_licitacion = dato['UnidadTiempoContratoLicitacion']
+                        valor_tiempo_renovacion = dato['ValorTiempoRenovacion']
+                        periodo_tiempo_renovacion = dato['PeriodoTiempoRenovacion']
+                        es_renovable = dato['EsRenovable']
+                        cantidad_items = dato.get('Items', {}).get('Cantidad')
 
-                        adjudicacion = item.get('Adjudicacion')
+                        adjudicacion = dato.get('Adjudicacion')
                         if adjudicacion:
-                            data['Adjudicacion_Tipo'] = adjudicacion.get('Tipo')
-                            data['Adjudicacion_Fecha'] = adjudicacion.get('Fecha')
-                            data['Adjudicacion_Numero'] = adjudicacion.get('Numero')
-                            data['Adjudicacion_NumeroOferentes'] = adjudicacion.get('NumeroOferentes')
-                            data['Adjudicacion_UrlActa'] = adjudicacion.get('UrlActa')
+                            adj_tipo = adjudicacion.get('Tipo')
+                            adj_fecha = adjudicacion.get('Fecha')
+                            adj_numero = adjudicacion.get('Numero')
+                            adj_num_oferentes = adjudicacion.get('NumeroOferentes')
+                            adj_url_acta = adjudicacion.get('UrlActa')
                         else:
-                            data['Adjudicacion_Tipo'] = None
-                            data['Adjudicacion_Fecha'] = None
-                            data['Adjudicacion_Numero'] = None
-                            data['Adjudicacion_NumeroOferentes'] = None
-                            data['Adjudicacion_UrlActa'] = None
+                            adj_tipo = 0
+                            adj_fecha = '1900-01-01'
+                            adj_numero = 0
+                            adj_num_oferentes = 0
+                            adj_url_acta = 'Sin Información'
+                        
+                        licitacion_insertada = False
+                        listado_items = dato.get('Items', {}).get('Listado', [])
+                        for index, item_data in enumerate(listado_items):
+                            item_correlativo = item_data['Correlativo']
+                            item_codigo_producto = item_data['CodigoProducto']
+                            item_codigo_categoria = item_data['CodigoCategoria']
+                            item_categoria = item_data['Categoria']
+                            item_nombre_producto = item_data['NombreProducto']
+                            item_descripcion = item_data['Descripcion']
+                            item_unidad_medida = item_data['UnidadMedida']
+                            item_cantidad = item_data['Cantidad']
 
-                        # Agregar fila para cada item en el DataFrame
-                        for i, item_data in enumerate(item.get('Items', {}).get('Listado', [])):
-                            item_row = data.copy()
-                            item_row.update({
-                                'Items_Correlativo': item_data.get('Correlativo'),
-                                'Items_CodigoProducto': item_data.get('CodigoProducto'),
-                                'Items_codigo_categoria': item_data.get('CodigoCategoria'),
-                                'Items_Categoria': item_data.get('Categoria'),
-                                'Items_NombreProducto': item_data.get('NombreProducto'),
-                                'Items_Descripcion': item_data.get('Descripcion'),
-                                'Items_UnidadMedida': item_data.get('UnidadMedida'),
-                                'Items_CantidadItem': item_data.get('Cantidad'),
-                            })
-
-                            adjudicacion = item_data.get('Adjudicacion')
-                            if adjudicacion is not None:
-                                item_row['Items_rut_proveedor'] = adjudicacion.get('RutProveedor')
-                                item_row['Items_nombre_proveedor'] = adjudicacion.get('NombreProveedor')
-                                item_row['Items_MontoUnitario'] = adjudicacion.get('MontoUnitario')
+                            item_adjudicacion = item_data['Adjudicacion']
+                            if item_adjudicacion:
+                                rut_proveedor = item_adjudicacion['RutProveedor']
+                                nombre_proveedor = item_adjudicacion['NombreProveedor']
+                                cantidad_adjudicada = item_adjudicacion['Cantidad']
+                                monto_unitario = item_adjudicacion['MontoUnitario']
+                            else:
+                                rut_proveedor = 'Sin Información'
+                                nombre_proveedor = 'Sin Información'
+                                cantidad_adjudicada = 0
+                                monto_unitario = 0
                             
                             related = False
-
                             # Buscar palabras clave en los datos de la licitación y los productos
                             for keyword in keywords:
                                 pattern = r'\b' + re.escape(keyword) + r'\b'
-                                if re.search(pattern, data['Nombre'], re.IGNORECASE) or \
-                                    re.search(pattern, data['Descripcion'], re.IGNORECASE) or \
-                                    re.search(pattern, item_row['Items_Descripcion'], re.IGNORECASE) or \
-                                    re.search(pattern, item_row['Items_Categoria'], re.IGNORECASE) or \
-                                    re.search(pattern, item_row['Items_NombreProducto'], re.IGNORECASE):
+                                if re.search(pattern, nombre, re.IGNORECASE) or \
+                                    re.search(pattern, descripcion, re.IGNORECASE) or \
+                                    re.search(pattern, item_descripcion, re.IGNORECASE) or \
+                                    re.search(pattern, item_categoria, re.IGNORECASE) or \
+                                    re.search(pattern, item_nombre_producto, re.IGNORECASE):
                                     related = True
-                                    _logger.info(f"Se ha encontrado en ítem: {item_row['Items_Correlativo']} un componente relacionado: {keyword}")
+                                    _logger.info(f"Se ha encontrado en ítem: {item_correlativo} relacionado a {keyword}")
                                     break
 
-                            # Verificar si se deben omitir productos
+                            # Verificar si se debe omitir el producto por falso positivo
                             for exclude_keyword in omitir_productos:
-                                if exclude_keyword.lower() in item_row['Items_NombreProducto'].lower():
+                                if exclude_keyword.lower() in item_nombre_producto.lower():
                                     related = False
-                                    _logger.info(f"Se ha encontrado en ítem: {item_row['Items_Correlativo']} un posible filtro erróneo: {exclude_keyword}.")
+                                    _logger.info(f"Se ha detectado al item correlativo: {item_correlativo} como falso positivo: {exclude_keyword}. Omitiendo item...")
 
                             if related:
-                                _logger.info(f"Encontrada licitación relacionada a '{keyword}'. Realizando inserción de licitación y items relacionados")
-                                _logger.info(f"INSERTANDO A ORGANISMO")
-                                self.insertar_organismo (
-                                    data['Comprador_CodigoOrganismo'],
-                                    data['Comprador_NombreOrganismo']
-                                )
-                                _logger.info(f"INSERTANDO A UNIDAD DE COMPRA")
-                                self.insertar_unidadCompra (
-                                    data['Comprador_CodigoUnidad'],
-                                    data['Comprador_RutUnidad'].upper(),
-                                    data['Comprador_NombreUnidad'],
-                                    data['Comprador_DireccionUnidad'],
-                                    data['Comprador_ComunaUnidad'],
-                                    data['Comprador_RegionUnidad'],
-                                    data['Comprador_CodigoOrganismo'] # organismo_id
-                                )
-                                _logger.info(f"INSERTANDO A PROVEEDOR")
-                                self.insertar_proveedor (
-                                    item_row['Items_rut_proveedor'],
-                                    item_row['Items_nombre_proveedor']
-                                )
-                                _logger.info(f"INSERTANDO A CATEGORIA")
-                                self.insertar_categoria (
-                                    item_row['Items_codigo_categoria'],
-                                    item_row['Items_Categoria']
-                                )
-                                _logger.info(f"INSERTANDO A CODIGO PRODUCTO: {item_row['Items_NombreProducto']} ")
-                                self.insertar_productoServicio (
-                                    item_row['Items_CodigoProducto'],
-                                    item_row['Items_NombreProducto'],
-                                    item_row['Items_codigo_categoria'] # categoria_id
-                                )
-                                _logger.info(f"INSERTANDO A ADJUDICACION")
-                                self.insertar_adjudicacion (
-                                    data['Adjudicacion_Numero'],
-                                    data['Adjudicacion_Fecha'],
-                                    data['Adjudicacion_NumeroOferentes'],
-                                    data['Adjudicacion_UrlActa'],
-                                    data['Adjudicacion_Tipo'] # tipo_acto_adm_id
-                                )
-                                _logger.info(f"INSERTANDO A LICITACION")
-                                self.insertar_licitacion (
-                                    data['CodigoExterno'], 
-                                    data['Nombre'], 
-                                    data['CodigoEstado'], 
-                                    data['Descripcion'],
-                                    data['FechaCierre1'], 
-                                    data['Estado'],
-                                    data['DiasCierreLicitacion'],
-                                    data['Informada'],
-                                    data['CodigoTipo'],
-                                    data['TipoConvocatoria'],
-                                    data['Etapas'], 
-                                    data['EstadoEtapas'],
-                                    data['TomaRazon'],
-                                    data['EstadoPublicidadOfertas'],
-                                    data['JustificacionPublicidad'],
-                                    data['Contrato'],
-                                    data['Obras'],
-                                    data['CantidadReclamos'],
-                                    data['FechaCreacion'],
-                                    data['FechaCierre2'],
-                                    data['FechaInicio'],
-                                    data['FechaFinal'],
-                                    data['FechaPubRespuestas'],
-                                    data['FechaActoAperturaTecnica'],
-                                    data['FechaActoAperturaEconomica'],
-                                    data['FechaPublicacion'],
-                                    data['FechaAdjudicacion'],
-                                    data['FechaEstimadaAdjudicacion'], 
-                                    data['FechaSoporteFisico'], 
-                                    data['FechaTiempoEvaluacion'],
-                                    data['FechaEstimadaFirma'], 
-                                    data['FechaUsuario'],
-                                    data['FechaVisitaTerreno'],
-                                    data['FechaEntregaAntecedentes'],
-                                    data['UnidadTiempoEvaluacion'],
-                                    data['DireccionVisita'],
-                                    data['DireccionEntrega'],
-                                    data['Estimacion'],
-                                    data['FuenteFinanciamiento'],
-                                    data['VisibilidadMonto'],
-                                    data['MontoEstimado'],
-                                    data['Tiempo'],
-                                    data['TipoPago'],
-                                    data['NombreResponsablePago'],
-                                    data['EmailResponsablePago'],
-                                    data['NombreResponsableContrato'],
-                                    data['EmailResponsableContrato'],
-                                    data['FonoResponsableContrato'],
-                                    data['ProhibicionContratacion'],
-                                    data['SubContratacion'],
-                                    data['TiempoDuracionContrato'],
-                                    data['JustificacionMontoEstimado'],
-                                    data['ObservacionContract'],
-                                    data['ExtensionPlazo'],
-                                    data['EsBaseTipo'],
-                                    data['UnidadTiempoContratoLicitacion'],
-                                    data['ValorTiempoRenovacion'],
-                                    data['PeriodoTiempoRenovacion'],
-                                    data['EsRenovable'],
-                                    data['Items_Cantidad'],
-                                    data['Comprador_CodigoUsuario'],
-                                    data['Comprador_RutUsuario'],
-                                    data['Comprador_NombreUsuario'],
-                                    data['Comprador_CargoUsuario'],
-                                    data['Adjudicacion_Numero'], # adjudicacion_id
-                                    data['Tipo'], # tipo_licitacion_id
-                                    data['UnidadTiempoEvaluacion'], # uni_tiempo_ev_id
-                                    data['Moneda'], # unidad_monetaria_id
-                                    data['VisibilidadMonto'], # monto_estimado_id
-                                    data['UnidadTiempoContratoLicitacion'], # uni_tiempo_con_id
-                                    data['Modalidad'], # modalidad_pago_id
-                                    data['Comprador_CodigoUnidad'] # UnidadCompra_codigoUnidad
-                                )
-                                _logger.info(f"INSERTANDO A ITEM DETALLES DE:")
-                                _logger.info(f"{item_row['Items_NombreProducto']}")
-                                self.insertar_item (
-                                    item_row['Items_Correlativo'], 
-                                    item_row['Items_UnidadMedida'],
-                                    item_row['Items_CantidadItem'],
-                                    item_row['Items_MontoUnitario'],
-                                    item_row['Items_Descripcion'],
-                                    data['CodigoExterno'], # licitacion_id
-                                    item_row['Items_CodigoProducto'], # producto_servicio_id
-                                    item_row['Items_rut_proveedor'] # proveedor_id
-                                )
-                                _logger.info(f"Los datos del item correlativo: {item_row['Items_Correlativo']} se han recopilado exitosamente.")    
-                            else:
-                                _logger.info(f"Se ha omitido la inserción del correlativo (item): {item_row['Items_Correlativo']}.")
-                        count += 1
-                        _logger.info(f"Los datos de la litación ID: {id} se han procesado exitosamente.")
-                else:
-                    _logger.info("Error al realizar la solicitud a la API para la ID:", id, "Código de Estado:", response.status_code,
-                    ":", response.reason)
-                    count += 1
+                                if not licitacion_insertada: 
+                                    _logger.info(f"INSERTANDO A ORGANISMO {codigo_organismo}: {nombre_organismo}")
+                                    self.insertar_organismo (codigo_organismo, nombre_organismo)
 
-                # Esperar 5 segundos entre cada solicitud para evitar errores
-                time.sleep(5)
-        
+                                    _logger.info(f"INSERTANDO A UNIDAD DE COMPRA {codigo_unidad}: {nombre_unidad}")
+                                    self.insertar_unidadCompra (
+                                        codigo_unidad,
+                                        rut_unidad.upper(),
+                                        nombre_unidad,
+                                        direccion_unidad,
+                                        comuna_unidad,
+                                        region_unidad,
+                                        codigo_organismo # organismo_id
+                                    )
+
+                                    _logger.info(f"INSERTANDO A ADJUDICACION {adj_numero}: {adj_fecha}")
+                                    self.insertar_adjudicacion (
+                                        adj_numero,
+                                        adj_fecha,
+                                        adj_num_oferentes,
+                                        adj_url_acta,
+                                        adj_tipo    # tipo_acto_adm_id
+                                    )
+
+                                    _logger.info(f"INSERTANDO A LICITACION {codigo_externo}: {nombre}")
+                                    self.insertar_licitacion (
+                                        codigo_externo, 
+                                        nombre, 
+                                        codigo_estado, 
+                                        descripcion,
+                                        fecha_cierre_1, 
+                                        estado,
+                                        dias_cierre_licitacion,
+                                        informada,
+                                        codigo_tipo,
+                                        tipo_convocatoria,
+                                        etapas, 
+                                        estado_etapas,
+                                        toma_razon,
+                                        estado_publicidad_ofertas,
+                                        justificacion_publicidad,
+                                        contrato,
+                                        obras,
+                                        cantidad_reclamos,
+                                        fecha_creacion,
+                                        fecha_cierre_2,
+                                        fecha_inicio,
+                                        fecha_final,
+                                        fecha_pub_respuestas,
+                                        fecha_apertura_tecnica,
+                                        fecha_apertura_economica,
+                                        fecha_publicacion,
+                                        fecha_adjudicacion,
+                                        fecha_estimada_adjudicacion,
+                                        fecha_soporte_fisico,
+                                        fecha_tiempo_evaluacion,
+                                        fecha_estimada_firma,
+                                        fecha_usuario,
+                                        fecha_visita_terreno,
+                                        fecha_entrega_antecedentes,
+                                        unidad_tiempo_evaluacion,
+                                        direccion_visitas,
+                                        direccion_entrega,
+                                        estimacion,
+                                        fuente_financiamiento,
+                                        visibilidad_monto,
+                                        monto_estimado,
+                                        tiempo,
+                                        tipo_pago,
+                                        nombre_reponsable_pago,
+                                        email_responsable_pago,
+                                        nombre_responsable_contrato,
+                                        email_responsable_contrato,
+                                        fono_responsable_contrato,
+                                        prohibicion_contratacion,
+                                        subcontratacion,
+                                        tiempo_duracion_contrato,
+                                        justificacion_monto_estimado,
+                                        observacion_contract,
+                                        extension_plazo,
+                                        es_base_tipo,
+                                        unidad_tiempo_contrato_licitacion,
+                                        valor_tiempo_renovacion,
+                                        periodo_tiempo_renovacion,
+                                        es_renovable,
+                                        cantidad_items,
+                                        codigo_comprador,
+                                        rut_comprador,
+                                        nombre_comprador,
+                                        cargo_comprador,
+                                        adj_numero,                         # adjudicacion_id
+                                        tipo,                               # tipo_licitacion_id
+                                        unidad_tiempo_evaluacion,           # uni_tiempo_ev_id
+                                        moneda,                             # unidad_monetaria_id
+                                        visibilidad_monto,                  # monto_estimado_id
+                                        unidad_tiempo_contrato_licitacion,  # uni_tiempo_con_id
+                                        modalidad,                          # modalidad_pago_id
+                                        codigo_unidad                       # UnidadCompra_codigoUnidad
+                                    )
+                                    licitacion_insertada = True
+                                    # <<< FIN if not licitacion_insertada: 
+
+                                _logger.info(f"INSERTANDO A PROVEEDOR {rut_proveedor}: {nombre_proveedor}")
+                                self.insertar_proveedor (rut_proveedor, nombre_proveedor)
+
+                                _logger.info(f"INSERTANDO A CATEGORIA {item_codigo_categoria}: {item_categoria}")
+                                self.insertar_categoria (item_codigo_categoria, item_categoria)
+
+                                _logger.info(f"INSERTANDO A CODIGO PRODUCTO {item_codigo_producto}: {item_nombre_producto}")
+                                self.insertar_productoServicio (item_codigo_producto, item_nombre_producto, item_codigo_categoria)
+
+                                _logger.info(f"INSERTANDO A ITEM CORRELATIVO {item_correlativo}: {item_descripcion}")
+                                self.insertar_item (
+                                    item_correlativo, 
+                                    item_unidad_medida,
+                                    cantidad_adjudicada,
+                                    monto_unitario,
+                                    item_descripcion,
+                                    codigo_externo,         # licitacion_id
+                                    item_codigo_producto,   # producto_servicio_id
+                                    rut_proveedor           # proveedor_id
+                                )
+
+                                _logger.info(f"Los datos del item correlativo: {item_correlativo} se han insertado exitosamente.")
+
+                                # <<< FIN if related
+                            # <<< FIN index, item_data in enumerate(listado_items):
+                        # <<< FIN for dato in datos_licitacion:
+
+                    
+                    # <<< FIN if response and response.status_code == 200:
+
+                else:
+                    _logger.info(f"No se pudo extraer la licitación {id}. Código de Estado: {response.status_code} - {response.reason}")
+                count += 1
+                # Esperar 2 segundos entre cada solicitud para evitar errores (ANTES ERA 5)
+                time.sleep(2)
+                # <<< FIN for id in listado:
         except KeyboardInterrupt:
             # Capturar la señal de "Ctrl + C" para detener la ejecución
-            print("Se ha detenido la ejecución. Guardando los datos recopilados hasta ahora en la base de datos.")
+            _logger.info("Se ha detenido la ejecución. Guardando los datos recopilados hasta ahora en la base de datos.")
+        # <<< FIN def extraccion_licitaciones_diarias(self):
 
     """
     =================================================================
@@ -1015,44 +1022,67 @@ class Licitacion(models.Model):
         \n\n\n
         ''')
 
-        df_cluster_0 = df[(df["Segment K-means PCA"] == 0)]
+        # df_cluster_0 = df[(df["Segment K-means PCA"] == 0)]
+        # _logger.info(f'''\n\n\n
+        # Showing DF Cluster 0 ...:
+        # Total: {len(df_cluster_0)}
+        # {df_cluster_0.head(50)}
+        # \n\n\n
+        # ''')
+
+        # df_cluster_2 = df[(df["Segment K-means PCA"] == 2)]
+        # _logger.info(f'''\n\n\n
+        # Showing DF Cluster 2 ...:
+        # Total: {len(df_cluster_2)}
+        # {df_cluster_2.head(50)}
+        # \n\n\n
+        # ''')
+
+        filtro_1 = df[(df["competenciaotros"] == 0)]
         _logger.info(f'''\n\n\n
-        Showing DF Cluster 0 ...:
-        Total: {len(df_cluster_0)}
-        {df_cluster_0.head(50)}
+        Showing DF filtro 1 ...:
+        Total: {len(filtro_1)}
+        {filtro_1[["idunidad", "competenciaotros", "Segment K-means PCA"]].head(50)}
         \n\n\n
         ''')
+        f1_list = filtro_1['idunidad'].tolist()
+        f1_list_str = ', '.join(map(str, f1_list))
 
-        df_cluster_2 = df[(df["Segment K-means PCA"] == 2)]
+        filtro_2 = df[(df["Segment K-means PCA"] == 2) & (df["competenciaotros"] == 1)]
         _logger.info(f'''\n\n\n
-        Showing DF Cluster 2 ...:
-        Total: {len(df_cluster_2)}
-        {df_cluster_2.head(50)}
+        Showing DF filtro 2 ...:
+        Total: {len(filtro_2)}
+        {filtro_2[["idunidad", "competenciaotros", "Segment K-means PCA"]].head(50)}
         \n\n\n
         ''')
+        f2_list = filtro_2['idunidad'].tolist()
+        f2_list_str = ', '.join(map(str, f2_list))
 
-        # Generar lista con los  clusters.
-        # Filtra las filas con cluster 0 o 2
-        filtro = (df['Segment K-means PCA'] == 0) | (df['Segment K-means PCA'] == 2)
+        filtro_3 = df[(df["Segment K-means PCA"] == 0) & (df["competenciaotros"] == 1)]
+        _logger.info(f'''\n\n\n
+        Showing DF filtro 3 ...:
+        Total: {len(filtro_3)}
+        {filtro_3[["idunidad", "competenciaotros", "Segment K-means PCA"]].head(50)}
+        \n\n\n
+        ''')
+        f3_list = filtro_3['idunidad'].tolist()
+        f3_list_str = ', '.join(map(str, f3_list))
+
+        # Generar lista con los  clusters de interes.
+        filtro = (
+            (df['competenciaotros'] == 0) | 
+            ((df['Segment K-means PCA'] == 2) & (df["competenciaotros"] == 1)) | 
+            ((df['Segment K-means PCA'] == 0) & (df["competenciaotros"] == 1) )
+        )
         df_filtrado = df[filtro]
 
-        # Crea una lista con los IDs
+        # Crea una lista con las unidades de compra a rankear
         uc_list = df_filtrado['idunidad'].tolist()
-        _logger.info(f'''\n\n\n
-        Showing uc_list ... :
-        {uc_list}
-        \n\n\n
-        ''')
-
+        _logger.info(f'''El filtro contiene {len(uc_list)} unidades de compra... ''')
         uc_list_str = ', '.join(map(str, uc_list))
-        _logger.info(f'''\n\n\n
-        Showing uc_list_str ... :
-        {uc_list_str}
-        \n\n\n
-        ''')
-        
-        # Rankear los Clusters de interes (0 y 2)
-        clusters_rank = f"""
+
+        # Crear vista ranking_ml
+        query_ranking_ml_view = f"""
         CREATE OR REPLACE VIEW licibot_ranking_ml AS
         SELECT 
             licibot_unidad_compra.id AS "ID Unidad de Compra",
@@ -1073,28 +1103,63 @@ class Licitacion(models.Model):
             "Monto Diferencial" DESC;
         """
         tools.drop_view_if_exists(self._cr, 'licibot_ranking_ml')
-        self.env.cr.execute(clusters_rank)
+        self.env.cr.execute(query_ranking_ml_view)
 
         # Limpiar todos los valores del campo "ranking" en el modelo UnidadCompra
         self.env.cr.execute("UPDATE licibot_unidad_compra SET ranking = NULL;")
 
         # Recuperar la lista de rut_unidad de la vista licibot_ranking_ml
-        ranking_length = int(self.env['ir.config_parameter'].sudo().get_param('licibot_module.ranking_length'))
-        self.env.cr.execute(f'SELECT "ID Unidad de Compra" FROM licibot_ranking_ml LIMIT {ranking_length};')
-        id_unidad_list = list(line[0] for line in self.env.cr.fetchall())
+        ranking_ml_length = int(self.env['ir.config_parameter'].sudo().get_param('licibot_module.ranking_ml_length'))
+        _logger.info(f"""\n\n
+            ranking_ml_length = {ranking_ml_length} 
+            f1_list = {len(f1_list)}
+            f2_list = {len(f2_list)}
+            f3_list = {len(f3_list)}
+            Espacio disponible para f3_list = {ranking_ml_length - (len(f1_list) + len(f2_list))}
+        \n\n""")
+        if len(f1_list) + len(f2_list) < ranking_ml_length:
+            ranking_ml_length =  ranking_ml_length - (len(f1_list) + len(f2_list))
+
+        if len(f1_list) > 0:
+            self.env.cr.execute(f'SELECT "ID Unidad de Compra" FROM licibot_ranking_ml WHERE "ID Unidad de Compra" IN ({f1_list_str});')
+            prior_f1_list = list(line[0] for line in self.env.cr.fetchall())
+        if len(f2_list) > 0:
+            self.env.cr.execute(f'SELECT "ID Unidad de Compra" FROM licibot_ranking_ml WHERE "ID Unidad de Compra" IN ({f2_list_str});')
+            prior_f2_list = list(line[0] for line in self.env.cr.fetchall())
+        if len(f3_list) > 0:
+            self.env.cr.execute(f'SELECT "ID Unidad de Compra" FROM licibot_ranking_ml WHERE "ID Unidad de Compra" IN ({f3_list_str}) LIMIT {ranking_ml_length};')
+            prior_f3_list = list(line[0] for line in self.env.cr.fetchall())
 
         # Inicializar el contador de ranking
         pos_ranking = 1
 
-        # Recorrer los primeros 20 elementos de la lista
-        for id_unidad in id_unidad_list: 
+        # Asignando las posiciones del ranking
+        # >>> Filtro 1
+        if len(f1_list) > 0:
+            for uc in prior_f1_list: 
+                # Buscar y actualizar el campo "ranking" en el modelo UnidadCompra
+                unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('id', '=', uc)])
+                unidad_compra.sudo().write({'ranking': pos_ranking})
+                # Incrementar el contador de ranking para el siguiente valor
+                pos_ranking += 1
+        
+        # >>> Filtro 2
+        if len(f2_list) > 0:
+            for uc in prior_f2_list: 
+                # Buscar y actualizar el campo "ranking" en el modelo UnidadCompra
+                unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('id', '=', uc)])
+                unidad_compra.sudo().write({'ranking': pos_ranking})
+                # Incrementar el contador de ranking para el siguiente valor
+                pos_ranking += 1
 
-            # Buscar y actualizar el campo "ranking" en el modelo UnidadCompra
-            unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('id', '=', id_unidad)])
-            unidad_compra.sudo().write({'ranking': pos_ranking})
-            
-            # Incrementar el contador de ranking para el siguiente valor
-            pos_ranking += 1
+        # >>> Filtro 3
+        if len(f3_list) > 0:
+            for uc in prior_f3_list: 
+                # Buscar y actualizar el campo "ranking" en el modelo UnidadCompra
+                unidad_compra = self.env['licibot.unidad.compra'].sudo().search([('id', '=', uc)])
+                unidad_compra.sudo().write({'ranking': pos_ranking})
+                # Incrementar el contador de ranking para el siguiente valor
+                pos_ranking += 1
 
         _logger.info('''\n\n\n>>> Finalizando CRON Licibot: Calcular Ranking ML <<<\n\n\n''')
 
@@ -1164,6 +1229,16 @@ class Licitacion(models.Model):
         # Comprueba si el string limpio está en la lista de valores permitidos
         if uni_tiempo_ev in valores_permitidos:
             return uni_tiempo_ev
+        else:
+            return 0
+
+    def normalize_tipo_acto_admin (self, tipo_acto_admin):
+        # Lista de valores permitidos
+        valores_permitidos = [1, 2, 3, 4, 5]
+
+        # Comprueba si el string limpio está en la lista de valores permitidos
+        if tipo_acto_admin in valores_permitidos:
+            return tipo_acto_admin
         else:
             return 0
 

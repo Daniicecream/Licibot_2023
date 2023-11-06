@@ -6,6 +6,11 @@
             <field name="value">20</field>
         </record>
 
+        <record id="licibot_ranking_ml_length" model="ir.config_parameter">
+            <field name="key">licibot_module.ranking_ml_length</field>
+            <field name="value">50</field>
+        </record>
+
         <record id="licibot_days_gone" model="ir.config_parameter">
             <field name="key">licibot_module.days_gone</field>
             <field name="value">180</field>
