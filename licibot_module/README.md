@@ -57,7 +57,7 @@ Dado que la información es recabada de la api de mercado público, cualquier
 falla o caída de esta puede afectar al correcto funcionamiento del módulo.
 
 ## Instrucciones de Instalación
-Para no sobreextender el archivo README.md se solicita que visite el <a href="static/Manual_de_Instalaci%C3%B3n.docx">Manual de Instalación</a> para conocer más sobre el paso a paso a seguir.
+Para no sobreextender el archivo README.md se solicita que visite el <a href="static/Manual_de_Instalación.docx">Manual de Instalación</a> para conocer más sobre el paso a paso a seguir.
 
 ## Creditos
 
