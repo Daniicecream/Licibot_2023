@@ -15,9 +15,8 @@
 ## Descripción
 Este módulo permite realizar peticiones a la api de mercadopublico.cl e ingresar dicha información en la base de datos de odoo.
 
-Adicionalmente se crea una vista interna en la base de datos que clasifica a las unidades de compra según su comportamiento en el mercado gracias técnicas de ML, concretamente un módelo K-Means, que primero separará a las unidades de compra en diferentes cluster 
-y posteriormente asignara las posiciones en el ranking (50 posiciones cómo máximo, sin embargo, este valor se puede cambiar en las configuraciones de odoo).
-Posteriormente envía la información de estas unidades de compra rankeadas al CRM de Odoo para que los distintos agentes comerciales puedan comenzar sus gestiones.
+Adicionalmente se crea una vista interna en la base de datos que clasifica a las unidades de compra según su comportamiento en el mercado gracias técnicas de ML, concretamente un módelo K-Means, que primero separará a las unidades de compra en diferentes cluster y posteriormente asignara las posiciones en el ranking (50 posiciones cómo máximo, sin embargo, este valor se puede cambiar en las configuraciones de odoo).
+Finalmente, envía la información de estas unidades de compra rankeadas al CRM de Odoo para que los distintos agentes comerciales puedan comenzar sus gestiones.
 
 ## Funcionamiento
 Una vez instalado el módulo se recomienda activar el modo desarrollador y dirigirse a Ajustes > Técnico > Parámetros del sistema.
@@ -37,6 +36,8 @@ Active los siguientes y configure la frecuencia a su criterio y/o necesidad:
 - CRON Licibot: Extracción Licitaciones Diarias, el cuál permite que se vayan recolectando licitaciones. Se recomienda seleccionar una hora en la que el ambiente no este siendo utilizado por ejemplo 1am.
 - CRON Licibot: Calcular Ranking ML, el cuál calcula las posiciones de las distintas unidades de compra en base a la información que sea recopilada.
 - CRON Licibot: Enviar al CRM, que envia al CRM aquellas unidades de compra que esten en el ranking. Cabe mencionar que si una unidad de compra ya se encuentra en el CRM y sigue estando en el ranking, esta no volvera a ser enviada a menos que hayan transcurrido la cantidad de días configurada (licibot_module.days_gone) entre la fecha de la última oportunidad ingresada y la fecha actual.
+
+Con estas configuraciones el módulo esta listo para funcionar de forma automatizada, recolectando día tras día nueva información directamente desde las licitaciones adjudicadas de mercado publico.
 
 ## Dependencias
 
